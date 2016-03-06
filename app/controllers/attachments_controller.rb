@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,12 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 class AttachmentsController < ApplicationController
-  before_filter :find_project, :except => :upload
+  before_filter :find_attachment, :only => [:show, :download, :thumbnail, :destroy]
+  before_filter :find_editable_attachments, :only => [:edit, :update]
   before_filter :file_readable, :read_authorize, :only => [:show, :download, :thumbnail]
   before_filter :delete_authorize, :only => :destroy
   before_filter :authorize_global, :only => :upload
 
-  accept_api_auth :show, :download, :upload
+  accept_api_auth :show, :download, :thumbnail, :upload
 
   def show
     respond_to do |format|
@@ -61,9 +62,9 @@ class AttachmentsController < ApplicationController
   end
 
   def thumbnail
-    if @attachment.thumbnailable? && thumbnail = @attachment.thumbnail(:size => params[:size])
-      if stale?(:etag => thumbnail)
-        send_file thumbnail,
+    if @attachment.thumbnailable? && tbnail = @attachment.thumbnail(:size => params[:size])
+      if stale?(:etag => tbnail)
+        send_file tbnail,
           :filename => filename_for_content_disposition(@attachment.filename),
           :type => detect_content_type(@attachment),
           :disposition => 'inline'
@@ -85,6 +86,7 @@ class AttachmentsController < ApplicationController
     @attachment = Attachment.new(:file => request.raw_post)
     @attachment.author = User.current
     @attachment.filename = params[:filename].presence || Redmine::Utils.random_hex(16)
+    @attachment.content_type = params[:content_type].presence
     saved = @attachment.save
 
     respond_to do |format|
@@ -97,6 +99,19 @@ class AttachmentsController < ApplicationController
         end
       }
     end
+  end
+
+  def edit
+  end
+
+  def update
+    if params[:attachments].is_a?(Hash)
+      if Attachment.update_attachments(@attachments, params[:attachments])
+        redirect_back_or_default home_path
+        return
+      end
+    end
+    render :action => 'edit'
   end
 
   def destroy
@@ -116,12 +131,34 @@ class AttachmentsController < ApplicationController
     end
   end
 
-private
-  def find_project
+  private
+
+  def find_attachment
     @attachment = Attachment.find(params[:id])
     # Show 404 if the filename in the url is wrong
     raise ActiveRecord::RecordNotFound if params[:filename] && params[:filename] != @attachment.filename
     @project = @attachment.project
+  rescue ActiveRecord::RecordNotFound
+    render_404
+  end
+
+  def find_editable_attachments
+    klass = params[:object_type].to_s.singularize.classify.constantize rescue nil
+    unless klass && klass.reflect_on_association(:attachments)
+      render_404
+      return
+    end
+
+    @container = klass.find(params[:object_id])
+    if @container.respond_to?(:visible?) && !@container.visible?
+      render_403
+      return
+    end
+    @attachments = @container.attachments.select(&:editable?)
+    if @container.respond_to?(:project)
+      @project = @container.project
+    end
+    render_404 if @attachments.empty?
   rescue ActiveRecord::RecordNotFound
     render_404
   end
@@ -146,7 +183,7 @@ private
 
   def detect_content_type(attachment)
     content_type = attachment.content_type
-    if content_type.blank?
+    if content_type.blank? || content_type == "application/octet-stream"
       content_type = Redmine::MimeType.of(attachment.filename)
     end
     content_type.to_s

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,6 +22,8 @@ class SettingsController < ApplicationController
   helper :queries
 
   before_filter :require_admin
+
+  require_sudo_mode :index, :edit, :plugin
 
   def index
     edit

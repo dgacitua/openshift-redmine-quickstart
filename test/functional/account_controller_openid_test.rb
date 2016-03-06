@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -157,7 +157,7 @@ class AccountControllerOpenidTest < ActionController::TestCase
         assert_response 302
       end
 
-      user = User.first(:order => 'id DESC')
+      user = User.order('id DESC').first
       assert_equal 'http://openid.example.com/good_blank_user', user.identity_url
       assert user.hashed_password.blank?, "Hashed password was #{user.hashed_password}"
     end

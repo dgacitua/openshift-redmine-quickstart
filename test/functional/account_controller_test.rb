@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class AccountControllerTest < ActionController::TestCase
-  fixtures :users, :roles
+  fixtures :users, :email_addresses, :roles
 
   def setup
     User.current = nil
@@ -33,7 +33,25 @@ class AccountControllerTest < ActionController::TestCase
     assert_select 'input[name=password]'
   end
 
-  def test_get_login_while_logged_in_should_redirect_to_home
+  def test_get_login_while_logged_in_should_redirect_to_back_url_if_present
+    @request.session[:user_id] = 2
+    @request.env["HTTP_REFERER"] = 'http://test.host/issues/show/1'
+
+    get :login, :back_url => 'http://test.host/issues/show/1'
+    assert_redirected_to '/issues/show/1'
+    assert_equal 2, @request.session[:user_id]
+  end
+
+  def test_get_login_while_logged_in_should_redirect_to_referer_without_back_url
+    @request.session[:user_id] = 2
+    @request.env["HTTP_REFERER"] = 'http://test.host/issues/show/1'
+
+    get :login
+    assert_redirected_to '/issues/show/1'
+    assert_equal 2, @request.session[:user_id]
+  end
+
+  def test_get_login_while_logged_in_should_redirect_to_home_by_default
     @request.session[:user_id] = 2
 
     get :login
@@ -43,13 +61,71 @@ class AccountControllerTest < ActionController::TestCase
 
   def test_login_should_redirect_to_back_url_param
     # request.uri is "test.host" in test environment
-    post :login, :username => 'jsmith', :password => 'jsmith', :back_url => 'http://test.host/issues/show/1'
-    assert_redirected_to '/issues/show/1'
+    back_urls = [
+      'http://test.host/issues/show/1',
+      'http://test.host/',
+      '/'
+    ]
+    back_urls.each do |back_url|
+      post :login, :username => 'jsmith', :password => 'jsmith', :back_url => back_url
+      assert_redirected_to back_url
+    end
+  end
+
+  def test_login_with_suburi_should_redirect_to_back_url_param
+    @relative_url_root = Redmine::Utils.relative_url_root
+    Redmine::Utils.relative_url_root = '/redmine'
+
+    back_urls = [
+      'http://test.host/redmine/issues/show/1',
+      '/redmine'
+    ]
+    back_urls.each do |back_url|
+      post :login, :username => 'jsmith', :password => 'jsmith', :back_url => back_url
+      assert_redirected_to back_url
+    end
+  ensure
+    Redmine::Utils.relative_url_root = @relative_url_root
   end
 
   def test_login_should_not_redirect_to_another_host
-    post :login, :username => 'jsmith', :password => 'jsmith', :back_url => 'http://test.foo/fake'
-    assert_redirected_to '/my/page'
+    back_urls = [
+      'http://test.foo/fake',
+      '//test.foo/fake'
+    ]
+    back_urls.each do |back_url|
+      post :login, :username => 'jsmith', :password => 'jsmith', :back_url => back_url
+      assert_redirected_to '/my/page'
+    end
+  end
+
+  def test_login_with_suburi_should_not_redirect_to_another_suburi
+    @relative_url_root = Redmine::Utils.relative_url_root
+    Redmine::Utils.relative_url_root = '/redmine'
+
+    back_urls = [
+      'http://test.host/',
+      'http://test.host/fake',
+      'http://test.host/fake/issues',
+      'http://test.host/redmine/../fake',
+      'http://test.host/redmine/../fake/issues',
+      'http://test.host/redmine/%2e%2e/fake',
+      '//test.foo/fake',
+      'http://test.host//fake',
+      'http://test.host/\n//fake',
+      '//bar@test.foo',
+      '//test.foo',
+      '////test.foo',
+      '@test.foo',
+      'fake@test.foo',
+      '.test.foo'
+    ]
+    back_urls.each do |back_url|
+      post :login, :username => 'jsmith', :password => 'jsmith', :back_url => back_url
+      assert_redirected_to '/my/page'
+    end
+  ensure
+    Redmine::Utils.relative_url_root = @relative_url_root
   end
 
   def test_login_with_wrong_password
@@ -100,7 +176,7 @@ class AccountControllerTest < ActionController::TestCase
 
     post :login, :username => 'jsmith', :password => 'jsmith'
     assert_response 500
-    assert_error_tag :content => /Something wrong/
+    assert_select_error /Something wrong/
   end
 
   def test_login_should_reset_session
@@ -185,7 +261,7 @@ class AccountControllerTest < ActionController::TestCase
         }
         assert_redirected_to '/my/account'
       end
-      user = User.first(:order => 'id DESC')
+      user = User.order('id DESC').first
       assert_equal 'register', user.login
       assert_equal 'John', user.firstname
       assert_equal 'Doe', user.lastname
@@ -236,6 +312,20 @@ class AccountControllerTest < ActionController::TestCase
     assert_select_email do
       assert_select "a[href=?]", "http://mydomain.foo/account/lost_password?token=#{token.value}"
     end
+  end
+
+  def test_lost_password_using_additional_email_address_should_send_email_to_the_address
+    EmailAddress.create!(:user_id => 2, :address => 'anotherAddress@foo.bar')
+    Token.delete_all
+
+    assert_difference 'ActionMailer::Base.deliveries.size' do
+      assert_difference 'Token.count' do
+        post :lost_password, :mail => 'ANOTHERaddress@foo.bar'
+        assert_redirected_to '/login'
+      end
+    end
+    mail = ActionMailer::Base.deliveries.last
+    assert_equal ['anotherAddress@foo.bar'], mail.bcc
   end
 
   def test_lost_password_for_unknown_user_should_fail

@@ -1,4 +1,4 @@
-# Update to 2.2, 2.4 by Karel Picman <karel.picman@kontron.com>
+# Update to 2.2, 2.4, 2.5, 2.6, 3.1 by Karel Picman <karel.picman@kontron.com>
 # Update to 1.1 by Michal Gebauer <mishak@mishak.net>
 # Updated by Josef Liška <jl@chl.cz>
 # CZ translation by Maxim Krušina | Massimo Filippi, s.r.o. | maxim@mxm.cz
@@ -134,7 +134,7 @@ cs:
         not_same_project: "nepatří stejnému projektu"
         circular_dependency: "Tento vztah by vytvořil cyklickou závislost"
         cant_link_an_issue_with_a_descendant: "Úkol nemůže být spojen s jedním z jeho dílčích úkolů"
-        earlier_than_minimum_start_date: "cannot be earlier than %{date} because of preceding issues"
+        earlier_than_minimum_start_date: "nemůže být dříve než %{date} kvůli předřazeným úkolům"
 
   actionview_instancetag_blank_option: Prosím vyberte
 
@@ -146,7 +146,8 @@ cs:
   general_csv_separator: ','
   general_csv_decimal_separator: '.'
   general_csv_encoding: UTF-8
-  general_pdf_encoding: UTF-8
+  general_pdf_fontname: freesans
+  general_pdf_monospaced_fontname: freemono
   general_first_day_of_week: '1'
 
   notice_account_updated: Účet byl úspěšně změněn.
@@ -413,15 +414,15 @@ cs:
   permission_protect_wiki_pages: Zabezpečení Wiki stránek
   permission_manage_repository: Spravování repozitáře
   permission_browse_repository: Procházení repozitáře
-  permission_view_changesets: Zobrazování sady změn
+  permission_view_changesets: Zobrazování revizí
   permission_commit_access: Commit přístup
   permission_manage_boards: Správa diskusních fór
-  permission_view_messages: Prohlížení zpráv
-  permission_add_messages: Posílání zpráv
-  permission_edit_messages: Upravování zpráv
-  permission_edit_own_messages: Upravit vlastní zprávy
-  permission_delete_messages: Mazání zpráv
-  permission_delete_own_messages: Smazat vlastní zprávy
+  permission_view_messages: Prohlížení příspěvků
+  permission_add_messages: Posílání příspěvků
+  permission_edit_messages: Upravování příspěvků
+  permission_edit_own_messages: Upravit vlastní příspěvky
+  permission_delete_messages: Mazání příspěvků
+  permission_delete_own_messages: Smazat vlastní příspěvky
   permission_export_wiki_pages: Exportovat Wiki stránky
   permission_manage_subtasks: Spravovat dílčí úkoly
 
@@ -554,10 +555,6 @@ cs:
   label_open_issues_plural: otevřené
   label_closed_issues: uzavřený
   label_closed_issues_plural: uzavřené
-  label_x_open_issues_abbr_on_total:
-    zero:  0 otevřených / %{total}
-    one:   1 otevřený / %{total}
-    other: "%{count} otevřených / %{total}"
   label_x_open_issues_abbr:
     zero:  0 otevřených
     one:   1 otevřený
@@ -578,7 +575,6 @@ cs:
   label_used_by: Použito
   label_details: Detaily
   label_add_note: Přidat poznámku
-  label_per_page: Na stránku
   label_calendar: Kalendář
   label_months_from: měsíců od
   label_gantt: Ganttův diagram
@@ -693,10 +689,6 @@ cs:
   label_blocked_by: blokován
   label_precedes: předchází
   label_follows: následuje
-  label_end_to_start: od konce do začátku
-  label_end_to_end: od konce do konce
-  label_start_to_start: od začátku do začátku
-  label_start_to_end: od začátku do konce
   label_stay_logged_in: Zůstat přihlášený
   label_disabled: zakázán
   label_show_completed_versions: Zobrazit dokončené verze
@@ -707,10 +699,10 @@ cs:
   label_board_locked: Zamčeno
   label_board_sticky: Nálepka
   label_topic_plural: Témata
-  label_message_plural: Zprávy
-  label_message_last: Poslední zpráva
-  label_message_new: Nová zpráva
-  label_message_posted: Zpráva přidána
+  label_message_plural: Příspěvky
+  label_message_last: Poslední příspěvek
+  label_message_new: Nový příspěvek
+  label_message_posted: Příspěvek přidán
   label_reply_plural: Odpovědi
   label_send_information: Zaslat informace o účtu uživateli
   label_year: Rok
@@ -730,7 +722,7 @@ cs:
   label_updated_time: "Aktualizováno před %{value}"
   label_jump_to_a_project: Vyberte projekt...
   label_file_plural: Soubory
-  label_changeset_plural: Sady změn
+  label_changeset_plural: Revize
   label_default_columns: Výchozí sloupce
   label_no_change_option: (beze změny)
   label_bulk_edit_selected_issues: Hromadná úprava vybraných úkolů
@@ -1104,3 +1096,89 @@ cs:
   notice_new_password_must_be_different: Nové heslo se musí lišit od stávajícího
   setting_mail_handler_excluded_filenames: Vyřadit přílohy podle jména
   text_convert_available: ImageMagick convert k dispozici (volitelné)
+  label_link: Odkaz 
+  label_only: jenom 
+  label_drop_down_list: rozbalovací seznam
+  label_checkboxes: zaškrtávátka
+  label_link_values_to: Propojit hodnoty s URL
+  setting_force_default_language_for_anonymous: Vynutit výchozí jazyk pro anonymní uživatele
+    users
+  setting_force_default_language_for_loggedin: Vynutit výchozí jazyk pro přihlášené uživatele
+    users
+  label_custom_field_select_type: Vybrat typ objektu, ke kterému bude přiřazeno uživatelské pole
+  label_issue_assigned_to_updated: Přiřazený uživatel aktualizován
+  label_check_for_updates: Zkontroluj aktualizace
+  label_latest_compatible_version: Poslední kompatibilní verze
+  label_unknown_plugin: Nezámý plugin
+  label_radio_buttons: radio tlačítka
+  label_group_anonymous: Anonymní uživatelé
+  label_group_non_member: Nečleni
+  label_add_projects: Přidat projekty
+  field_default_status: Výchozí stav
+  text_subversion_repository_note: 'Např.: file:///, http://, https://, svn://, svn+[tunnelscheme]://'
+  field_users_visibility: Viditelnost uživatelů
+  label_users_visibility_all: Všichni aktivní uživatelé
+  label_users_visibility_members_of_visible_projects: Členové viditelných projektů
+  label_edit_attachments: Editovat přiložené soubory
+  setting_link_copied_issue: Vytvořit odkazy na kopírované úkol
+  label_link_copied_issue: Vytvořit odkaz na kopírovaný úkol
+  label_ask: Zeptat se
+  label_search_attachments_yes: Vyhledat názvy a popisy souborů
+  label_search_attachments_no: Nevyhledávat soubory
+  label_search_attachments_only: Vyhledávat pouze soubory
+  label_search_open_issues_only: Pouze otevřené úkoly
+  field_address: Email
+  setting_max_additional_emails: Maximální počet dalších emailových adres
+  label_email_address_plural: Emaily
+  label_email_address_add: Přidat emailovou adresu
+  label_enable_notifications: Povolit notifikace
+  label_disable_notifications: Zakázat notifikace
+  setting_search_results_per_page: Vyhledaných výsledků na stránku
+  label_blank_value: prázdný
+  permission_copy_issues: Kopírovat úkoly
+  error_password_expired: Platnost vašeho hesla vypršela a administrátor vás žádá o jeho změnu.
+  field_time_entries_visibility: Viditelnost šasového logu
+  setting_password_max_age: Změna hesla je vyžadována po
+  label_parent_task_attributes: Atributy rodičovského úkolu
+  label_parent_task_attributes_derived: Vypočteno z dílčích úkolů
+  label_parent_task_attributes_independent: Nezávisle na dílčích úkolech
+  label_time_entries_visibility_all: Všechny zaznamenané časy
+  label_time_entries_visibility_own: Zaznamenané časy vytvořené uživatelem
+  label_member_management: Správa členů
+  label_member_management_all_roles: Všechny role
+  label_member_management_selected_roles_only: Pouze tyto role
+  label_password_required: Pro pokračování potvrďte vaše heslo
+  label_total_spent_time: Celkem strávený čas
+  notice_import_finished: All %{count} items have been imported.
+  notice_import_finished_with_errors: ! '%{count} out of %{total} items could not be
+    imported.'
+  error_invalid_file_encoding: The file is not a valid %{encoding} encoded file
+  error_invalid_csv_file_or_settings: The file is not a CSV file or does not match the
+    settings below
+  error_can_not_read_import_file: An error occurred while reading the file to import
+  permission_import_issues: Import issues
+  label_import_issues: Import issues
+  label_select_file_to_import: Select the file to import
+  label_fields_separator: Field separator
+  label_fields_wrapper: Field wrapper
+  label_encoding: Encoding
+  label_comma_char: Comma
+  label_semi_colon_char: Semi colon
+  label_quote_char: Quote
+  label_double_quote_char: Double quote
+  label_fields_mapping: Fields mapping
+  label_file_content_preview: File content preview
+  label_create_missing_values: Create missing values
+  button_import: Import
+  field_total_estimated_hours: Total estimated time
+  label_api: API
+  label_total_plural: Totals
+  label_assigned_issues: Assigned issues
+  label_field_format_enumeration: Key/value list
+  label_f_hour_short: '%{value} h'
+  field_default_version: Default version
+  error_attachment_extension_not_allowed: Attachment extension %{extension} is not allowed
+  setting_attachment_extensions_allowed: Allowed extensions
+  setting_attachment_extensions_denied: Disallowed extensions
+  label_any_open_issues: any open issues
+  label_no_open_issues: no open issues

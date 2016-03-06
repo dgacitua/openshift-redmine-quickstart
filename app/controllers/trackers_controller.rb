@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -29,14 +29,14 @@ class TrackersController < ApplicationController
         render :action => "index", :layout => false if request.xhr?
       }
       format.api {
-        @trackers = Tracker.sorted.all
+        @trackers = Tracker.sorted.to_a
       }
     end
   end
 
   def new
     @tracker ||= Tracker.new(params[:tracker])
-    @trackers = Tracker.sorted.all
+    @trackers = Tracker.sorted.to_a
     @projects = Project.all
   end
 
@@ -64,7 +64,7 @@ class TrackersController < ApplicationController
     @tracker = Tracker.find(params[:id])
     if @tracker.update_attributes(params[:tracker])
       flash[:notice] = l(:notice_successful_update)
-      redirect_to trackers_path
+      redirect_to trackers_path(:page => params[:page])
       return
     end
     edit
@@ -95,7 +95,7 @@ class TrackersController < ApplicationController
       redirect_to fields_trackers_path
       return
     end
-    @trackers = Tracker.sorted.all
+    @trackers = Tracker.sorted.to_a
     @custom_fields = IssueCustomField.all.sort
   end
 end

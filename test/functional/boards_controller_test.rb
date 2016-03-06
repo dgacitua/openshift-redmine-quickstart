@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -57,7 +57,7 @@ class BoardsControllerTest < ActionController::TestCase
 
   def test_show_should_display_sticky_messages_first
     Message.update_all(:sticky => 0)
-    Message.update_all({:sticky => 1}, {:id => 1})
+    Message.where({:id => 1}).update_all({:sticky => 1})
 
     get :show, :project_id => 1, :id => 1
     assert_response :success
@@ -117,9 +117,13 @@ class BoardsControllerTest < ActionController::TestCase
 
     assert_select 'select[name=?]', 'board[parent_id]' do
       assert_select 'option', (Project.find(1).boards.size + 1)
-      assert_select 'option[value=]', :text => '&nbsp;'
-      assert_select 'option[value=1]', :text => 'Help'
+      assert_select 'option[value=""]'
+      assert_select 'option[value="1"]', :text => 'Help'
     end
+
+    # &nbsp; replaced by nokogiri, not easy to test in DOM assertions
+    assert_not_include '<option value=""></option>', response.body
+    assert_include '<option value="">&nbsp;</option>', response.body
   end
 
   def test_new_without_project_boards
@@ -139,7 +143,7 @@ class BoardsControllerTest < ActionController::TestCase
       post :create, :project_id => 1, :board => { :name => 'Testing', :description => 'Testing board creation'}
     end
     assert_redirected_to '/projects/ecookbook/settings/boards'
-    board = Board.first(:order => 'id DESC')
+    board = Board.order('id DESC').first
     assert_equal 'Testing', board.name
     assert_equal 'Testing board creation', board.description
   end
@@ -150,7 +154,7 @@ class BoardsControllerTest < ActionController::TestCase
       post :create, :project_id => 1, :board => { :name => 'Testing', :description => 'Testing', :parent_id => 2}
     end
     assert_redirected_to '/projects/ecookbook/settings/boards'
-    board = Board.first(:order => 'id DESC')
+    board = Board.order('id DESC').first
     assert_equal Board.find(2), board.parent
   end
 
@@ -178,7 +182,7 @@ class BoardsControllerTest < ActionController::TestCase
     assert_template 'edit'
 
     assert_select 'select[name=?]', 'board[parent_id]' do
-      assert_select 'option[value=2][selected=selected]'
+      assert_select 'option[value="2"][selected=selected]'
     end
   end
 

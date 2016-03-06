@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -30,6 +30,12 @@ class GroupsControllerTest < ActionController::TestCase
     assert_template 'index'
   end
 
+  def test_index_should_show_user_count
+    get :index
+    assert_response :success
+    assert_select 'tr#group-11 td.user_count', :text => '1'
+  end
+
   def test_show
     get :show, :id => 10
     assert_response :success
@@ -53,7 +59,7 @@ class GroupsControllerTest < ActionController::TestCase
       post :create, :group => {:name => 'New group'}
     end
     assert_redirected_to '/groups'
-    group = Group.first(:order => 'id DESC')
+    group = Group.order('id DESC').first
     assert_equal 'New group', group.name
     assert_equal [], group.users
   end
@@ -63,7 +69,7 @@ class GroupsControllerTest < ActionController::TestCase
       post :create, :group => {:name => 'New group'}, :continue => 'Create and continue'
     end
     assert_redirected_to '/groups/new'
-    group = Group.first(:order => 'id DESC')
+    group = Group.order('id DESC').first
     assert_equal 'New group', group.name
   end
 
@@ -107,6 +113,18 @@ class GroupsControllerTest < ActionController::TestCase
     assert_redirected_to '/groups'
   end
 
+  def test_new_users
+    get :new_users, :id => 10
+    assert_response :success
+    assert_template 'new_users'
+  end
+
+  def test_xhr_new_users
+    xhr :get, :new_users, :id => 10
+    assert_response :success
+    assert_equal 'text/javascript', response.content_type
+  end
+
   def test_add_users
     assert_difference 'Group.find(10).users.count', 2 do
       post :add_users, :id => 10, :user_ids => ['2', '3']
@@ -138,64 +156,8 @@ class GroupsControllerTest < ActionController::TestCase
     end
   end
 
-  def test_new_membership
-    assert_difference 'Group.find(10).members.count' do
-      post :edit_membership, :id => 10, :membership => { :project_id => 2, :role_ids => ['1', '2']}
-    end
-  end
-
-  def test_xhr_new_membership
-    assert_difference 'Group.find(10).members.count' do
-      xhr :post, :edit_membership, :id => 10, :membership => { :project_id => 2, :role_ids => ['1', '2']}
-      assert_response :success
-      assert_template 'edit_membership'
-      assert_equal 'text/javascript', response.content_type
-    end
-    assert_match /OnlineStore/, response.body
-  end
-
-  def test_xhr_new_membership_with_failure
-    assert_no_difference 'Group.find(10).members.count' do
-      xhr :post, :edit_membership, :id => 10, :membership => { :project_id => 999, :role_ids => ['1', '2']}
-      assert_response :success
-      assert_template 'edit_membership'
-      assert_equal 'text/javascript', response.content_type
-    end
-    assert_match /alert/, response.body, "Alert message not sent"
-  end
-
-  def test_edit_membership
-    assert_no_difference 'Group.find(10).members.count' do
-      post :edit_membership, :id => 10, :membership_id => 6, :membership => { :role_ids => ['1', '3']}
-    end
-  end
-
-  def test_xhr_edit_membership
-    assert_no_difference 'Group.find(10).members.count' do
-      xhr :post, :edit_membership, :id => 10, :membership_id => 6, :membership => { :role_ids => ['1', '3']}
-      assert_response :success
-      assert_template 'edit_membership'
-      assert_equal 'text/javascript', response.content_type
-    end
-  end
-
-  def test_destroy_membership
-    assert_difference 'Group.find(10).members.count', -1 do
-      post :destroy_membership, :id => 10, :membership_id => 6
-    end
-  end
-
-  def test_xhr_destroy_membership
-    assert_difference 'Group.find(10).members.count', -1 do
-      xhr :post, :destroy_membership, :id => 10, :membership_id => 6
-      assert_response :success
-      assert_template 'destroy_membership'
-      assert_equal 'text/javascript', response.content_type
-    end
-  end
-
   def test_autocomplete_for_user
-    get :autocomplete_for_user, :id => 10, :q => 'smi', :format => 'js'
+    xhr :get, :autocomplete_for_user, :id => 10, :q => 'smi', :format => 'js'
     assert_response :success
     assert_include 'John Smith', response.body
   end

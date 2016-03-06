@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,7 +23,7 @@ class WikiTest < ActiveSupport::TestCase
   fixtures :projects, :wikis, :wiki_pages, :wiki_contents, :wiki_content_versions
 
   def test_create
-    wiki = Wiki.new(:project => Project.find(2))
+    wiki = Wiki.new(:project => Project.find(3))
     assert !wiki.save
     assert_equal 1, wiki.errors.count
 
@@ -78,8 +78,7 @@ class WikiTest < ActiveSupport::TestCase
   end
 
   def test_titleize
-    ja_test = "\xe3\x83\x86\xe3\x82\xb9\xe3\x83\x88"
-    ja_test.force_encoding('UTF-8') if ja_test.respond_to?(:force_encoding)
+    ja_test = "\xe3\x83\x86\xe3\x82\xb9\xe3\x83\x88".force_encoding('UTF-8')
     assert_equal 'Page_title_with_CAPITALES', Wiki.titleize('page title with CAPITALES')
     assert_equal ja_test, Wiki.titleize(ja_test)
   end
@@ -97,5 +96,19 @@ class WikiTest < ActiveSupport::TestCase
 
     assert_kind_of WikiPage, @wiki.sidebar
     assert_equal 'Sidebar', @wiki.sidebar.title
+  end
+
+  def test_destroy_should_remove_redirects_from_the_wiki
+    WikiRedirect.create!(:wiki_id => 1, :title => 'Foo', :redirects_to_wiki_id => 2, :redirects_to => 'Bar')
+
+    Wiki.find(1).destroy
+    assert_equal 0, WikiRedirect.where(:wiki_id => 1).count
+  end
+
+  def test_destroy_should_remove_redirects_to_the_wiki
+    WikiRedirect.create!(:wiki_id => 2, :title => 'Foo', :redirects_to_wiki_id => 1, :redirects_to => 'Bar')
+
+    Wiki.find(1).destroy
+    assert_equal 0, WikiRedirect.where(:redirects_to_wiki_id => 1).count
   end
 end

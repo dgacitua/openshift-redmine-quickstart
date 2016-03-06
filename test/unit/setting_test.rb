@@ -1,5 +1,7 @@
+# encoding: utf-8
+#
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,6 +26,9 @@ class SettingTest < ActiveSupport::TestCase
   end
 
   def test_read_default
+    Setting.delete_all
+    Setting.clear_cache
+
     assert_equal "Redmine", Setting.app_title
     assert Setting.self_registration?
     assert !Setting.login_required?
@@ -39,6 +44,20 @@ class SettingTest < ActiveSupport::TestCase
     assert_equal "My other title", Setting.app_title
     # make sure db has been updated (UPDATE)
     assert_equal "My other title", Setting.find_by_name('app_title').value
+  end
+
+  def test_setting_with_int_format_should_accept_numeric_only
+    with_settings :session_timeout => 30 do
+      Setting.session_timeout = 'foo'
+      assert_equal "30", Setting.session_timeout
+      Setting.session_timeout = 40
+      assert_equal "40", Setting.session_timeout
+    end
+  end
+
+  def test_setting_with_invalid_name_should_be_valid
+    setting = Setting.new(:name => "does_not_exist", :value => "should_not_be_allowed")
+    assert !setting.save
   end
 
   def test_serialized_setting
@@ -86,5 +105,26 @@ class SettingTest < ActiveSupport::TestCase
     with_settings :per_page_options => '25, 10, 50' do
       assert_equal [10, 25, 50], Setting.per_page_options_array
     end
+  end
+
+  def test_setting_serialied_as_binary_should_be_loaded_as_utf8_encoded_strings
+    yaml = <<-YAML
+--- 
+- keywords: !binary |
+    Zml4ZXMsY2xvc2VzLNC40YHQv9GA0LDQstC70LXQvdC+LNCz0L7RgtC+0LLQ
+    vizRgdC00LXQu9Cw0L3QvixmaXhlZA==
+
+  done_ratio: "100"
+  status_id: "5"
+YAML
+
+    Setting.commit_update_keywords = {}
+    assert_equal 1, Setting.where(:name => 'commit_update_keywords').update_all(:value => yaml)
+    Setting.clear_cache
+
+    assert_equal 'UTF-8', Setting.commit_update_keywords.first['keywords'].encoding.name
+  ensure
+    Setting.where(:name => 'commit_update_keywords').delete_all
+    Setting.clear_cache
   end
 end

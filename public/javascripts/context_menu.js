@@ -1,3 +1,6 @@
+/* Redmine - project management software
+   Copyright (C) 2006-2015  Jean-Philippe Lang */
+
 var contextMenuObserving;
 var contextMenuUrl;
 
@@ -31,7 +34,7 @@ function contextMenuClick(event) {
       // a row was clicked, check if the click was on checkbox
       if (target.is('input')) {
         // a checkbox may be clicked
-        if (target.attr('checked')) {
+        if (target.prop('checked')) {
           tr.addClass('context-menu-selection');
         } else {
           tr.removeClass('context-menu-selection');
@@ -64,6 +67,8 @@ function contextMenuClick(event) {
       // click is outside the rows
       if (target.is('a') && (target.hasClass('disabled') || target.hasClass('submenu'))) {
         event.preventDefault();
+      } else if (target.is('.toggle-selection')) {
+        // nop
       } else {
         contextMenuUnselectAll();
       }
@@ -146,6 +151,7 @@ function contextMenuLastSelected() {
 }
 
 function contextMenuUnselectAll() {
+  $('input[type=checkbox].toggle-selection').prop('checked', false);
   $('.hascontextmenu').each(function(){
     contextMenuRemoveSelection($(this));
   });
@@ -180,7 +186,7 @@ function contextMenuIsSelected(tr) {
 }
 
 function contextMenuCheckSelectionBox(tr, checked) {
-  tr.find('input[type=checkbox]').attr('checked', checked);
+  tr.find('input[type=checkbox]').prop('checked', checked);
 }
 
 function contextMenuClearDocumentSelection() {
@@ -205,18 +211,9 @@ function contextMenuInit(url) {
 }
 
 function toggleIssuesSelection(el) {
-  var boxes = $(el).parents('form').find('input[type=checkbox]');
-  var all_checked = true;
-  boxes.each(function(){ if (!$(this).attr('checked')) { all_checked = false; } });
-  boxes.each(function(){
-    if (all_checked) {
-      $(this).removeAttr('checked');
-      $(this).parents('tr').removeClass('context-menu-selection');
-    } else if (!$(this).attr('checked')) {
-      $(this).attr('checked', true);
-      $(this).parents('tr').addClass('context-menu-selection');
-    }
-  });
+  var checked = $(this).prop('checked');
+  var boxes = $(this).parents('table').find('input[name=ids\\[\\]]');
+  boxes.prop('checked', checked).parents('tr').toggleClass('context-menu-selection', checked);
 }
 
 function window_size() {
@@ -234,3 +231,7 @@ function window_size() {
   }
   return {width: w, height: h};
 }
+
+$(document).ready(function(){
+  $('input[type=checkbox].toggle-selection').on('change', toggleIssuesSelection);
+});

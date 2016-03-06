@@ -157,11 +157,12 @@ pt-BR:
   general_text_Yes: 'Sim'
   general_text_no: 'não'
   general_text_yes: 'sim'
-  general_lang_name: 'Português(Brasil)'
+  general_lang_name: 'Portuguese/Brasil (Português/Brasil)'
   general_csv_separator: ';'
   general_csv_decimal_separator: ','
   general_csv_encoding: ISO-8859-1
-  general_pdf_encoding: UTF-8
+  general_pdf_fontname: freesans
+  general_pdf_monospaced_fontname: freemono
   general_first_day_of_week: '1'
 
   notice_account_updated: Conta atualizada com sucesso.
@@ -452,10 +453,6 @@ pt-BR:
   label_open_issues_plural: Abertas
   label_closed_issues: Fechada
   label_closed_issues_plural: Fechadas
-  label_x_open_issues_abbr_on_total:
-    zero:  0 aberta / %{total}
-    one:   1 aberta / %{total}
-    other: "%{count} abertas / %{total}"
   label_x_open_issues_abbr:
     zero:  0 aberta
     one:   1 aberta
@@ -476,7 +473,6 @@ pt-BR:
   label_used_by: Usado por
   label_details: Detalhes
   label_add_note: Adicionar nota
-  label_per_page: Por página
   label_calendar: Calendário
   label_months_from: meses a partir de
   label_gantt: Gantt
@@ -582,10 +578,6 @@ pt-BR:
   label_blocked_by: bloqueado por
   label_precedes: precede
   label_follows: segue
-  label_end_to_start: fim para o início
-  label_end_to_end: fim para fim
-  label_start_to_start: início para início
-  label_start_to_end: início para fim
   label_stay_logged_in: Permanecer logado
   label_disabled: desabilitado
   label_show_completed_versions: Exibir versões completas
@@ -1109,15 +1101,102 @@ pt-BR:
   field_generate_password: Gerar senha
   setting_default_projects_tracker_ids: Tipos padrões para novos projeto
   label_total_time: Total
-  notice_account_not_activated_yet: You haven't activated your account yet. If you want
-    to receive a new activation email, please <a href="%{url}">click this link</a>.
-  notice_account_locked: Your account is locked.
-  label_hidden: Hidden
-  label_visibility_private: to me only
-  label_visibility_roles: to these roles only
-  label_visibility_public: to any users
-  field_must_change_passwd: Must change password at next logon
-  notice_new_password_must_be_different: The new password must be different from the
-    current password
-  setting_mail_handler_excluded_filenames: Exclude attachments by name
-  text_convert_available: ImageMagick convert available (optional)
+  notice_account_not_activated_yet: Sua conta ainda não foi ativada. Se você deseja receber
+    um novo email de ativação, por favor <a href="%{url}">clique aqui</a>.
+  notice_account_locked: Sua conta está bloqueada.
+  label_hidden: Visibilidade
+  label_visibility_private: para mim
+  label_visibility_roles: para os papéis
+  label_visibility_public: para qualquer usuário
+  field_must_change_passwd: É necessário alterar sua senha na próxima vez que tentar acessar sua conta
+  notice_new_password_must_be_different: A nova senha deve ser diferente da senha atual
+  setting_mail_handler_excluded_filenames: Exclui anexos por nome
+  text_convert_available: Conversor ImageMagick disponível (opcional)
+  label_link: Link
+  label_only: somente
+  label_drop_down_list: lista suspensa
+  label_checkboxes: checkboxes
+  label_link_values_to: Valores do link para URL
+  setting_force_default_language_for_anonymous: Force default language for anonymous
+    users
+  setting_force_default_language_for_loggedin: Force default language for logged-in
+    users
+  label_custom_field_select_type: Select the type of object to which the custom field
+    is to be attached
+  label_issue_assigned_to_updated: Assignee updated
+  label_check_for_updates: Check for updates
+  label_latest_compatible_version: Latest compatible version
+  label_unknown_plugin: Unknown plugin
+  label_radio_buttons: radio buttons
+  label_group_anonymous: Anonymous users
+  label_group_non_member: Non member users
+  label_add_projects: Add projects
+  field_default_status: Default status
+  text_subversion_repository_note: 'Examples: file:///, http://, https://, svn://, svn+[tunnelscheme]://'
+  field_users_visibility: Users visibility
+  label_users_visibility_all: All active users
+  label_users_visibility_members_of_visible_projects: Members of visible projects
+  label_edit_attachments: Edit attached files
+  setting_link_copied_issue: Link issues on copy
+  label_link_copied_issue: Link copied issue
+  label_ask: Ask
+  label_search_attachments_yes: Search attachment filenames and descriptions
+  label_search_attachments_no: Do not search attachments
+  label_search_attachments_only: Search attachments only
+  label_search_open_issues_only: Open issues only
+  field_address: E-mail
+  setting_max_additional_emails: Maximum number of additional email addresses
+  label_email_address_plural: Emails
+  label_email_address_add: Add email address
+  label_enable_notifications: Enable notifications
+  label_disable_notifications: Disable notifications
+  setting_search_results_per_page: Search results per page
+  label_blank_value: blank
+  permission_copy_issues: Copy issues
+  error_password_expired: Your password has expired or the administrator requires you
+    to change it.
+  field_time_entries_visibility: Time logs visibility
+  setting_password_max_age: Require password change after
+  label_parent_task_attributes: Parent tasks attributes
+  label_parent_task_attributes_derived: Calculated from subtasks
+  label_parent_task_attributes_independent: Independent of subtasks
+  label_time_entries_visibility_all: All time entries
+  label_time_entries_visibility_own: Time entries created by the user
+  label_member_management: Member management
+  label_member_management_all_roles: All roles
+  label_member_management_selected_roles_only: Only these roles
+  label_password_required: Confirm your password to continue
+  label_total_spent_time: Tempo gasto geral
+  notice_import_finished: All %{count} items have been imported.
+  notice_import_finished_with_errors: ! '%{count} out of %{total} items could not be
+    imported.'
+  error_invalid_file_encoding: The file is not a valid %{encoding} encoded file
+  error_invalid_csv_file_or_settings: The file is not a CSV file or does not match the
+    settings below
+  error_can_not_read_import_file: An error occurred while reading the file to import
+  permission_import_issues: Import issues
+  label_import_issues: Import issues
+  label_select_file_to_import: Select the file to import
+  label_fields_separator: Field separator
+  label_fields_wrapper: Field wrapper
+  label_encoding: Encoding
+  label_comma_char: Comma
+  label_semi_colon_char: Semi colon
+  label_quote_char: Quote
+  label_double_quote_char: Double quote
+  label_fields_mapping: Fields mapping
+  label_file_content_preview: File content preview
+  label_create_missing_values: Create missing values
+  button_import: Import
+  field_total_estimated_hours: Total estimated time
+  label_api: API
+  label_total_plural: Totals
+  label_assigned_issues: Assigned issues
+  label_field_format_enumeration: Key/value list
+  label_f_hour_short: '%{value} h'
+  field_default_version: Default version
+  error_attachment_extension_not_allowed: Attachment extension %{extension} is not allowed
+  setting_attachment_extensions_allowed: Allowed extensions
+  setting_attachment_extensions_denied: Disallowed extensions
+  label_any_open_issues: any open issues
+  label_no_open_issues: no open issues

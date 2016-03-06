@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,19 +20,43 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class PrincipalTest < ActiveSupport::TestCase
-  fixtures :users, :projects, :members, :member_roles
+  fixtures :users, :projects, :members, :member_roles, :roles,
+           :email_addresses
 
   def test_active_scope_should_return_groups_and_active_users
-    result = Principal.active.all
+    result = Principal.active.to_a
     assert_include Group.first, result
     assert_not_nil result.detect {|p| p.is_a?(User)}
     assert_nil result.detect {|p| p.is_a?(User) && !p.active?}
     assert_nil result.detect {|p| p.is_a?(AnonymousUser)}
   end
 
+  def test_visible_scope_for_admin_should_return_all_principals
+    admin = User.generate! {|u| u.admin = true}
+    assert_equal Principal.count, Principal.visible(admin).count
+  end
+
+  def test_visible_scope_for_user_with_members_of_visible_projects_visibility_should_return_active_principals
+    Role.non_member.update! :users_visibility => 'all'
+    user = User.generate!
+
+    expected = Principal.active
+    assert_equal expected.map(&:id).sort, Principal.visible(user).pluck(:id).sort
+  end
+
+  def test_visible_scope_for_user_with_members_of_visible_projects_visibility_should_return_members_of_visible_projects_and_self
+    Role.non_member.update! :users_visibility => 'members_of_visible_projects'
+    user = User.generate!
+
+    expected = Project.visible(user).map {|p| p.memberships.active}.flatten.map(&:principal).uniq << user
+    assert_equal expected.map(&:id).sort, Principal.visible(user).pluck(:id).sort
+  end
+
   def test_member_of_scope_should_return_the_union_of_all_members
-    projects = Project.find_all_by_id(1, 2)
-    assert_equal projects.map(&:principals).flatten.sort, Principal.member_of(projects).sort
+    projects = Project.find([1])
+    assert_equal [3, 2], Principal.member_of(projects).sort.map(&:id)
+    projects = Project.find([1, 2])
+    assert_equal [3, 2, 8, 11], Principal.member_of(projects).sort.map(&:id)
   end
 
   def test_member_of_scope_should_be_empty_for_no_projects
@@ -40,9 +64,12 @@ class PrincipalTest < ActiveSupport::TestCase
   end
 
   def test_not_member_of_scope_should_return_users_that_have_no_memberships
-    projects = Project.find_all_by_id(1, 2)
-    expected = (Principal.all - projects.map(&:memberships).flatten.map(&:principal)).sort
-    assert_equal expected, Principal.not_member_of(projects).sort
+    [[1], [1, 2]].each do |ids|
+      projects = Project.find(ids)
+      assert_equal ids.size, projects.count
+      expected = (Principal.all - projects.map(&:memberships).flatten.map(&:principal)).sort
+      assert_equal expected, Principal.not_member_of(projects).sort
+    end
   end
 
   def test_not_member_of_scope_should_be_empty_for_no_projects
@@ -50,17 +77,12 @@ class PrincipalTest < ActiveSupport::TestCase
   end
 
   def test_sorted_scope_should_sort_users_before_groups
-    scope = Principal.where("type <> ?", 'AnonymousUser')
-    expected_order = scope.all.sort do |a, b|
-      if a.is_a?(User) && b.is_a?(Group)
-        -1
-      elsif a.is_a?(Group) && b.is_a?(User)
-        1
-      else
-        a.name.downcase <=> b.name.downcase
-      end
-    end
-    assert_equal expected_order.map(&:name).map(&:downcase), scope.sorted.all.map(&:name).map(&:downcase)
+    scope = Principal.where(:type => ['User', 'Group'])
+    users = scope.select {|p| p.is_a?(User)}.sort
+    groups = scope.select {|p| p.is_a?(Group)}.sort
+
+    assert_equal (users + groups).map(&:name).map(&:downcase),
+                 scope.sorted.map(&:name).map(&:downcase)
   end
 
   test "like scope should search login" do

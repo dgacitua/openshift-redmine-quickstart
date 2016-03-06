@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,28 +18,32 @@
 class Group < Principal
   include Redmine::SafeAttributes
 
-  has_and_belongs_to_many :users, :after_add => :user_added,
-                                  :after_remove => :user_removed
+  has_and_belongs_to_many :users,
+                          :join_table   => "#{table_name_prefix}groups_users#{table_name_suffix}",
+                          :after_add => :user_added,
+                          :after_remove => :user_removed
 
   acts_as_customizable
 
   validates_presence_of :lastname
   validates_uniqueness_of :lastname, :case_sensitive => false
   validates_length_of :lastname, :maximum => 255
+  attr_protected :id
 
   before_destroy :remove_references_before_destroy
 
-  scope :sorted, lambda { order("#{table_name}.lastname ASC") }
+  scope :sorted, lambda { order(:type => :asc, :lastname => :asc) }
   scope :named, lambda {|arg| where("LOWER(#{table_name}.lastname) = LOWER(?)", arg.to_s.strip)}
+  scope :givable, lambda {where(:type => 'Group')}
 
   safe_attributes 'name',
     'user_ids',
     'custom_field_values',
     'custom_fields',
-    :if => lambda {|group, user| user.admin?}
+    :if => lambda {|group, user| user.admin? && !group.builtin?}
 
   def to_s
-    lastname.to_s
+    name.to_s
   end
 
   def name
@@ -48,6 +52,20 @@ class Group < Principal
 
   def name=(arg)
     self.lastname = arg
+  end
+
+  def builtin_type
+    nil
+  end
+
+  # Return true if the group is a builtin group
+  def builtin?
+    false
+  end
+
+  # Returns true if the group can be given to a user
+  def givable?
+    !builtin?
   end
 
   def user_added(user)
@@ -64,9 +82,8 @@ class Group < Principal
   def user_removed(user)
     members.each do |member|
       MemberRole.
-        includes(:member).
+        joins(:member).
         where("#{Member.table_name}.user_id = ? AND #{MemberRole.table_name}.inherited_from IN (?)", user.id, member.member_role_ids).
-        all.
         each(&:destroy)
     end
   end
@@ -79,12 +96,22 @@ class Group < Principal
     super(attr_name, *args)
   end
 
+  def self.anonymous
+    GroupAnonymous.load_instance
+  end
+
+  def self.non_member
+    GroupNonMember.load_instance
+  end
+
   private
 
   # Removes references that are not handled by associations
   def remove_references_before_destroy
     return if self.id.nil?
 
-    Issue.update_all 'assigned_to_id = NULL', ['assigned_to_id = ?', id]
+    Issue.where(['assigned_to_id = ?', id]).update_all('assigned_to_id = NULL')
   end
 end
+
+require_dependency "group_builtin"

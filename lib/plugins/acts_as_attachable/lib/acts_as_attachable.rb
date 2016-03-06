@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -27,11 +27,11 @@ module Redmine
           cattr_accessor :attachable_options
           self.attachable_options = {}
           attachable_options[:view_permission] = options.delete(:view_permission) || "view_#{self.name.pluralize.underscore}".to_sym
+          attachable_options[:edit_permission] = options.delete(:edit_permission) || "edit_#{self.name.pluralize.underscore}".to_sym
           attachable_options[:delete_permission] = options.delete(:delete_permission) || "edit_#{self.name.pluralize.underscore}".to_sym
 
-          has_many :attachments, options.merge(:as => :container,
-                                               :order => "#{Attachment.table_name}.created_on ASC, #{Attachment.table_name}.id ASC",
-                                               :dependent => :destroy)
+          has_many :attachments, lambda {order("#{Attachment.table_name}.created_on ASC, #{Attachment.table_name}.id ASC")},
+                                 options.merge(:as => :container, :dependent => :destroy, :inverse_of => :container)
           send :include, Redmine::Acts::Attachable::InstanceMethods
           before_save :attach_saved_attachments
         end
@@ -45,6 +45,11 @@ module Redmine
         def attachments_visible?(user=User.current)
           (respond_to?(:visible?) ? visible?(user) : true) &&
             user.allowed_to?(self.class.attachable_options[:view_permission], self.project)
+        end
+
+        def attachments_editable?(user=User.current)
+          (respond_to?(:visible?) ? visible?(user) : true) &&
+            user.allowed_to?(self.class.attachable_options[:edit_permission], self.project)
         end
 
         def attachments_deletable?(user=User.current)
@@ -87,7 +92,7 @@ module Redmine
                 a = Attachment.find_by_token(token)
                 next unless a
                 a.filename = attachment['filename'] unless attachment['filename'].blank?
-                a.content_type = attachment['content_type']
+                a.content_type = attachment['content_type'] unless attachment['content_type'].blank?
               end
               next unless a
               a.description = attachment['description'].to_s.strip

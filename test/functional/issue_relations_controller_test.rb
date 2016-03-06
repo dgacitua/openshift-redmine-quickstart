@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -41,10 +41,18 @@ class IssueRelationsControllerTest < ActionController::TestCase
       post :create, :issue_id => 1,
                  :relation => {:issue_to_id => '2', :relation_type => 'relates', :delay => ''}
     end
-    relation = IssueRelation.first(:order => 'id DESC')
+    relation = IssueRelation.order('id DESC').first
     assert_equal 1, relation.issue_from_id
     assert_equal 2, relation.issue_to_id
     assert_equal 'relates', relation.relation_type
+  end
+
+  def test_create_on_invalid_issue
+    assert_no_difference 'IssueRelation.count' do
+      post :create, :issue_id => 999,
+        :relation => {:issue_to_id => '2', :relation_type => 'relates', :delay => ''}
+      assert_response 404
+    end
   end
 
   def test_create_xhr
@@ -54,7 +62,7 @@ class IssueRelationsControllerTest < ActionController::TestCase
       assert_template 'create'
       assert_equal 'text/javascript', response.content_type
     end
-    relation = IssueRelation.first(:order => 'id DESC')
+    relation = IssueRelation.order('id DESC').first
     assert_equal 3, relation.issue_from_id
     assert_equal 1, relation.issue_to_id
 
@@ -66,7 +74,7 @@ class IssueRelationsControllerTest < ActionController::TestCase
       post :create, :issue_id => 1,
                  :relation => {:issue_to_id => '#2', :relation_type => 'relates', :delay => ''}
     end
-    relation = IssueRelation.first(:order => 'id DESC')
+    relation = IssueRelation.order('id DESC').first
     assert_equal 2, relation.issue_to_id
   end
 
@@ -75,7 +83,7 @@ class IssueRelationsControllerTest < ActionController::TestCase
       post :create, :issue_id => 1,
                  :relation => {:issue_to_id => ' 2  ', :relation_type => 'relates', :delay => ''}
     end
-    relation = IssueRelation.first(:order => 'id DESC')
+    relation = IssueRelation.order('id DESC').first
     assert_equal 2, relation.issue_to_id
   end
 
@@ -124,6 +132,13 @@ class IssueRelationsControllerTest < ActionController::TestCase
   def test_destroy
     assert_difference 'IssueRelation.count', -1 do
       delete :destroy, :id => '2'
+    end
+  end
+
+  def test_destroy_invalid_relation
+    assert_no_difference 'IssueRelation.count' do
+      delete :destroy, :id => '999'
+      assert_response 404
     end
   end
 

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,9 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class NewsControllerTest < ActionController::TestCase
-  fixtures :projects, :users, :roles, :members, :member_roles, :enabled_modules, :news, :comments
+  fixtures :projects, :users, :email_addresses, :roles, :members, :member_roles,
+           :enabled_modules, :news, :comments,
+           :attachments
 
   def setup
     User.current = nil
@@ -48,7 +50,7 @@ class NewsControllerTest < ActionController::TestCase
     get :show, :id => 1
     assert_response :success
     assert_template 'show'
-    assert_tag :tag => 'h2', :content => /eCookbook first release/
+    assert_select 'h2', :text => /eCookbook first release/
   end
 
   def test_show_should_show_attachments
@@ -58,7 +60,18 @@ class NewsControllerTest < ActionController::TestCase
 
     get :show, :id => 1
     assert_response :success
-    assert_tag 'a', :content => attachment.filename
+    assert_select 'a', :text => attachment.filename
+  end
+
+  def test_show_with_comments_in_reverse_order
+    user = User.find(1)
+    user.pref[:comments_sorting] = 'desc'
+    user.pref.save!
+
+    @request.session[:user_id] = 1
+    get :show, :id => 1
+    assert_response :success
+    assert_equal News.find(1).comments.to_a.sort_by(&:created_on).reverse, assigns(:comments)
   end
 
   def test_show_not_found
@@ -102,8 +115,8 @@ class NewsControllerTest < ActionController::TestCase
           :attachments => {'1' => {'file' => uploaded_test_file('testfile.txt', 'text/plain')}}
       end
     end
-    attachment = Attachment.first(:order => 'id DESC')
-    news = News.first(:order => 'id DESC')
+    attachment = Attachment.order('id DESC').first
+    news = News.order('id DESC').first
     assert_equal news, attachment.container
   end
 
@@ -116,7 +129,7 @@ class NewsControllerTest < ActionController::TestCase
     assert_template 'new'
     assert_not_nil assigns(:news)
     assert assigns(:news).new_record?
-    assert_error_tag :content => /title can&#x27;t be blank/i
+    assert_select_error /title cannot be blank/i
   end
 
   def test_get_edit
@@ -144,7 +157,7 @@ class NewsControllerTest < ActionController::TestCase
           :attachments => {'1' => {'file' => uploaded_test_file('testfile.txt', 'text/plain')}}
       end
     end
-    attachment = Attachment.first(:order => 'id DESC')
+    attachment = Attachment.order('id DESC').first
     assert_equal News.find(1), attachment.container
   end
 
@@ -153,7 +166,7 @@ class NewsControllerTest < ActionController::TestCase
     put :update, :id => 1, :news => { :description => '' }
     assert_response :success
     assert_template 'edit'
-    assert_error_tag :content => /description can&#x27;t be blank/i
+    assert_select_error /description cannot be blank/i
   end
 
   def test_destroy

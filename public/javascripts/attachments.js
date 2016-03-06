@@ -1,5 +1,5 @@
 /* Redmine - project management software
-   Copyright (C) 2006-2013  Jean-Philippe Lang */
+   Copyright (C) 2006-2015  Jean-Philippe Lang */
 
 function addFile(inputEl, file, eagerUpload) {
 
@@ -94,13 +94,16 @@ function uploadBlob(blob, uploadUrl, attachmentId, options) {
   uploadUrl = uploadUrl + '?attachment_id=' + attachmentId;
   if (blob instanceof window.File) {
     uploadUrl += '&filename=' + encodeURIComponent(blob.name);
+    uploadUrl += '&content_type=' + encodeURIComponent(blob.type);
   }
 
   return $.ajax(uploadUrl, {
     type: 'POST',
     contentType: 'application/octet-stream',
-    beforeSend: function(jqXhr) {
+    beforeSend: function(jqXhr, settings) {
       jqXhr.setRequestHeader('Accept', 'application/js');
+      // attach proper File object 
+      settings.data = blob;
     },
     xhr: function() {
       var xhr = $.ajaxSettings.xhr();
@@ -117,7 +120,7 @@ function uploadBlob(blob, uploadUrl, attachmentId, options) {
 function addInputFiles(inputEl) {
   var clearedFileInput = $(inputEl).clone().val('');
 
-  if (inputEl.files) {
+  if ($.ajaxSettings.xhr().upload && inputEl.files) {
     // upload files using ajax
     uploadAndAttachFiles(inputEl.files, inputEl);
     $(inputEl).remove();

@@ -1,7 +1,7 @@
 # encoding: utf-8
 #
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,14 +19,10 @@
 
 module WatchersHelper
 
-  def watcher_tag(object, user, options={})
-    ActiveSupport::Deprecation.warn "#watcher_tag is deprecated and will be removed in Redmine 3.0. Use #watcher_link instead."
-    watcher_link(object, user)
-  end
-
   def watcher_link(objects, user)
     return '' unless user && user.logged?
     objects = Array.wrap(objects)
+    return '' unless objects.any?
 
     watched = Watcher.any_watched?(objects, user)
     css = [watcher_css(objects), watched ? 'icon icon-fav' : 'icon icon-fav-off'].join(' ')

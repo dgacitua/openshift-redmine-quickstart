@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -34,7 +34,7 @@ class AccountController < ApplicationController
   def login
     if request.get?
       if User.current.logged?
-        redirect_to home_url
+        redirect_back_or_default home_url, :referer => true
       end
     else
       authenticate_user
@@ -82,7 +82,8 @@ class AccountController < ApplicationController
       return
     else
       if request.post?
-        user = User.find_by_mail(params[:mail].to_s)
+        email = params[:mail].to_s
+        user = User.find_by_mail(email)
         # user not found
         unless user
           flash.now[:error] = l(:notice_account_unknown_email)
@@ -100,7 +101,9 @@ class AccountController < ApplicationController
         # create a new token for password recovery
         token = Token.new(:user => user, :action => "recovery")
         if token.save
-          Mailer.lost_password(token).deliver
+          # Don't use the param to send the email
+          recipent = user.mails.detect {|e| email.casecmp(e) == 0} || user.mail
+          Mailer.lost_password(token, recipent).deliver
           flash[:notice] = l(:notice_account_lost_email_sent)
           redirect_to signin_path
           return
@@ -198,6 +201,7 @@ class AccountController < ApplicationController
       # Valid user
       if user.active?
         successful_authentication(user)
+        update_sudo_timestamp! # activate Sudo Mode
       else
         handle_inactive_user(user)
       end
@@ -261,11 +265,15 @@ class AccountController < ApplicationController
 
   def set_autologin_cookie(user)
     token = Token.create(:user => user, :action => 'autologin')
+    secure = Redmine::Configuration['autologin_cookie_secure']
+    if secure.nil?
+      secure = request.ssl?
+    end
     cookie_options = {
       :value => token.value,
       :expires => 1.year.from_now,
-      :path => (Redmine::Configuration['autologin_cookie_path'] || '/'),
-      :secure => (Redmine::Configuration['autologin_cookie_secure'] ? true : false),
+      :path => (Redmine::Configuration['autologin_cookie_path'] || RedmineApp::Application.config.relative_url_root || '/'),
+      :secure => secure,
       :httponly => true
     }
     cookies[autologin_cookie_name] = cookie_options
@@ -290,7 +298,7 @@ class AccountController < ApplicationController
     token = Token.new(:user => user, :action => "register")
     if user.save and token.save
       Mailer.register(token).deliver
-      flash[:notice] = l(:notice_account_register_done, :email => user.mail)
+      flash[:notice] = l(:notice_account_register_done, :email => ERB::Util.h(user.mail))
       redirect_to signin_path
     else
       yield if block_given?

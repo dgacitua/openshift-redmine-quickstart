@@ -15,7 +15,7 @@
   <tbody>
 <% for tracker in @trackers %>
   <tr class="<%= cycle("odd", "even") %>">
-  <td class="name"><%= link_to h(tracker.name), edit_tracker_path(tracker) %></td>
+  <td class="name"><%= link_to tracker.name, edit_tracker_path(tracker) %></td>
   <td>
     <% unless tracker.workflow_rules.count > 0 %>
       <span class="icon icon-warning">
@@ -24,7 +24,7 @@
     <% end %>
   </td>
   <td class="reorder">
-    <%= reorder_links('tracker', {:action => 'update', :id => tracker}, :put) %>
+    <%= reorder_links('tracker', {:action => 'update', :id => tracker, :page => params[:page]}, :put) %>
   </td>
   <td class="buttons">
     <%= delete_link tracker_path(tracker) %>
@@ -34,6 +34,6 @@
   </tbody>
 </table>
 
-<p class="pagination"><%= pagination_links_full @tracker_pages %></p>
+<span class="pagination"><%= pagination_links_full @tracker_pages %></span>
 
 <% html_title(l(:label_tracker_plural)) -%>

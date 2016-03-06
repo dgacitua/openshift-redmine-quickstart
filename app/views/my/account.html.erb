@@ -1,9 +1,14 @@
 <div class="contextual">
+<%= additional_emails_link(@user) %>
 <%= link_to(l(:button_change_password), {:action => 'password'}, :class => 'icon icon-passwd') if @user.change_password_allowed? %>
 <%= call_hook(:view_my_account_contextual, :user => @user)%>
 </div>
 
-<h2><%=l(:label_my_account)%></h2>
+<h2>
+  <%= avatar_edit_link(@user, :size => "50") %>
+  <%=l(:label_my_account)%>
+</h2>
+
 <%= error_messages_for 'user' %>
 
 <%= labelled_form_for :user, @user,
@@ -16,7 +21,9 @@
   <p><%= f.text_field :firstname, :required => true %></p>
   <p><%= f.text_field :lastname, :required => true %></p>
   <p><%= f.text_field :mail, :required => true %></p>
+  <% unless @user.force_default_language? %>
   <p><%= f.select :language, lang_options_for_select %></p>
+  <% end %>
   <% if Setting.openid? %>
   <p><%= f.text_field :identity_url  %></p>
   <% end %>
@@ -27,7 +34,7 @@
   <%= call_hook(:view_my_account, :user => @user, :form => f) %>
 </fieldset>
 
-<%= submit_tag l(:button_save) %>
+<p class="mobile-hide"><%= submit_tag l(:button_save) %></p>
 </div>
 
 <div class="splitcontentright">
@@ -42,6 +49,7 @@
   <%= call_hook(:view_my_account_preferences, :user => @user, :form => f) %>
 </fieldset>
 
+<p class="mobile-show"><%= submit_tag l(:button_save) %></p>
 </div>
 <% end %>
 

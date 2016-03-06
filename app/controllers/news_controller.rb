@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -42,11 +42,11 @@ class NewsController < ApplicationController
     @news_count = scope.count
     @news_pages = Paginator.new @news_count, @limit, params['page']
     @offset ||= @news_pages.offset
-    @newss = scope.all(:include => [:author, :project],
-                                       :order => "#{News.table_name}.created_on DESC",
-                                       :offset => @offset,
-                                       :limit => @limit)
-
+    @newss = scope.includes([:author, :project]).
+                      order("#{News.table_name}.created_on DESC").
+                      limit(@limit).
+                      offset(@offset).
+                      to_a
     respond_to do |format|
       format.html {
         @news = News.new # for adding news inline
@@ -58,7 +58,7 @@ class NewsController < ApplicationController
   end
 
   def show
-    @comments = @news.comments
+    @comments = @news.comments.to_a
     @comments.reverse! if User.current.wants_comments_in_reverse_order?
   end
 

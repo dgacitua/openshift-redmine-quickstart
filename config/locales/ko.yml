@@ -188,7 +188,8 @@ ko:
   general_csv_separator: ','
   general_csv_decimal_separator: '.'
   general_csv_encoding: CP949
-  general_pdf_encoding: CP949
+  general_pdf_fontname: hysmyeongjostdmedium
+  general_pdf_monospaced_fontname: hysmyeongjostdmedium
   general_first_day_of_week: '7'
 
   notice_account_updated: 계정이 성공적으로 변경되었습니다.
@@ -545,10 +546,6 @@ ko:
   label_open_issues_plural: 진행중
   label_closed_issues: 완료됨
   label_closed_issues_plural: 완료됨
-  label_x_open_issues_abbr_on_total:
-    zero:  "총 %{total} 건 모두 완료"
-    one:   "한 건 진행 중 / 총 %{total} 건 중 "
-    other: "%{count} 건 진행 중 / 총 %{total} 건"
   label_x_open_issues_abbr:
     zero:  모두 완료
     one:   한 건 진행 중
@@ -569,7 +566,6 @@ ko:
   label_used_by: 사용됨
   label_details: 자세히
   label_add_note: 일감덧글 추가
-  label_per_page: 페이지별
   label_calendar: 달력
   label_months_from: 개월 동안 | 다음부터
   label_gantt: Gantt 챠트
@@ -679,10 +675,6 @@ ko:
   label_blocked_by: "다음 일감에게 막혀 있음:"
   label_precedes: "다음에 진행할 일감:"
   label_follows: "다음 일감을 우선 진행:"
-  label_end_to_start: "끝에서 시작"
-  label_end_to_end: "끝에서 끝"
-  label_start_to_start: "시작에서 시작" 
-  label_start_to_end: "시작에서 끝"
   label_stay_logged_in: 로그인 유지
   label_disabled: 비활성화
   label_show_completed_versions: 완료된 버전 보기
@@ -1131,22 +1123,105 @@ ko:
   permission_add_documents: 문서 추가
   permission_edit_documents: 문서 편집
   permission_delete_documents: 문서 삭제
-  label_gantt_progress_line: Progress line
+  label_gantt_progress_line: 진행 선
   setting_jsonp_enabled: JSONP 허용
   field_inherit_members: 상위 프로젝트로부터 구성원을 상속
   field_closed_on: 완료일
-  field_generate_password: Generate password
+  field_generate_password: 비밀번호 생성
   setting_default_projects_tracker_ids: 새 프로젝트에 기본적으로 추가할 일감 유형
   label_total_time: 합계
-  notice_account_not_activated_yet: You haven't activated your account yet. If you want
-    to receive a new activation email, please <a href="%{url}">click this link</a>.
-  notice_account_locked: Your account is locked.
-  label_hidden: Hidden
-  label_visibility_private: to me only
-  label_visibility_roles: to these roles only
-  label_visibility_public: to any users
-  field_must_change_passwd: Must change password at next logon
-  notice_new_password_must_be_different: The new password must be different from the
-    current password
-  setting_mail_handler_excluded_filenames: Exclude attachments by name
-  text_convert_available: ImageMagick convert available (optional)
+  notice_account_not_activated_yet: 계정이 활성화되지 않았습니다. 계정을 활성화하기 위해 메일을 다시 수신하려면 <a href="%{url}">여기를 클릭해 주세요</a>.
+  notice_account_locked: 계정이 잠겨 있습니다.
+  label_hidden: 숨김
+  label_visibility_private: 자신 만
+  label_visibility_roles: 다음 역할 만
+  label_visibility_public: 모든 사용자
+  field_must_change_passwd: 다음 로그온 시 반드시 암호를 변경해야 함
+  notice_new_password_must_be_different: 새 암호는 현재 암호와 달라야 합니다.
+  setting_mail_handler_excluded_filenames: 제외할 첨부 파일명
+  text_convert_available: ImageMagick 변환 사용 가능 (옵션)
+  label_link: 링크
+  label_only: 다음의 것만
+  label_drop_down_list: 드롭다운 목록
+  label_checkboxes: 체크박스
+  label_link_values_to: URL 링크 값
+  setting_force_default_language_for_anonymous: 익명 사용자의 기본 언어 강제
+  setting_force_default_language_for_loggedin: 로그인 사용자의 기본 언어 강제
+  label_custom_field_select_type: 사용자 정의 필드에 추가할 대상을 선택해주세요.
+  label_issue_assigned_to_updated: Assignee updated
+  label_check_for_updates: Check for updates
+  label_latest_compatible_version: Latest compatible version
+  label_unknown_plugin: Unknown plugin
+  label_radio_buttons: radio buttons
+  label_group_anonymous: Anonymous users
+  label_group_non_member: Non member users
+  label_add_projects: Add projects
+  field_default_status: Default status
+  text_subversion_repository_note: 'Examples: file:///, http://, https://, svn://, svn+[tunnelscheme]://'
+  field_users_visibility: Users visibility
+  label_users_visibility_all: All active users
+  label_users_visibility_members_of_visible_projects: Members of visible projects
+  label_edit_attachments: Edit attached files
+  setting_link_copied_issue: Link issues on copy
+  label_link_copied_issue: Link copied issue
+  label_ask: Ask
+  label_search_attachments_yes: Search attachment filenames and descriptions
+  label_search_attachments_no: Do not search attachments
+  label_search_attachments_only: Search attachments only
+  label_search_open_issues_only: Open issues only
+  field_address: 메일
+  setting_max_additional_emails: Maximum number of additional email addresses
+  label_email_address_plural: Emails
+  label_email_address_add: Add email address
+  label_enable_notifications: Enable notifications
+  label_disable_notifications: Disable notifications
+  setting_search_results_per_page: Search results per page
+  label_blank_value: blank
+  permission_copy_issues: Copy issues
+  error_password_expired: Your password has expired or the administrator requires you
+    to change it.
+  field_time_entries_visibility: Time logs visibility
+  setting_password_max_age: Require password change after
+  label_parent_task_attributes: Parent tasks attributes
+  label_parent_task_attributes_derived: Calculated from subtasks
+  label_parent_task_attributes_independent: Independent of subtasks
+  label_time_entries_visibility_all: All time entries
+  label_time_entries_visibility_own: Time entries created by the user
+  label_member_management: Member management
+  label_member_management_all_roles: All roles
+  label_member_management_selected_roles_only: Only these roles
+  label_password_required: Confirm your password to continue
+  label_total_spent_time: 총 소요시간
+  notice_import_finished: All %{count} items have been imported.
+  notice_import_finished_with_errors: ! '%{count} out of %{total} items could not be
+    imported.'
+  error_invalid_file_encoding: The file is not a valid %{encoding} encoded file
+  error_invalid_csv_file_or_settings: The file is not a CSV file or does not match the
+    settings below
+  error_can_not_read_import_file: An error occurred while reading the file to import
+  permission_import_issues: Import issues
+  label_import_issues: Import issues
+  label_select_file_to_import: Select the file to import
+  label_fields_separator: Field separator
+  label_fields_wrapper: Field wrapper
+  label_encoding: Encoding
+  label_comma_char: Comma
+  label_semi_colon_char: Semi colon
+  label_quote_char: Quote
+  label_double_quote_char: Double quote
+  label_fields_mapping: Fields mapping
+  label_file_content_preview: File content preview
+  label_create_missing_values: Create missing values
+  button_import: Import
+  field_total_estimated_hours: Total estimated time
+  label_api: API
+  label_total_plural: Totals
+  label_assigned_issues: Assigned issues
+  label_field_format_enumeration: Key/value list
+  label_f_hour_short: '%{value} h'
+  field_default_version: Default version
+  error_attachment_extension_not_allowed: Attachment extension %{extension} is not allowed
+  setting_attachment_extensions_allowed: Allowed extensions
+  setting_attachment_extensions_denied: Disallowed extensions
+  label_any_open_issues: any open issues
+  label_no_open_issues: no open issues

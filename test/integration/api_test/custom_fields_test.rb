@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,10 +20,6 @@ require File.expand_path('../../../test_helper', __FILE__)
 class Redmine::ApiTest::CustomFieldsTest < Redmine::ApiTest::Base
   fixtures :users, :custom_fields
 
-  def setup
-    Setting.rest_api_enabled = '1'
-  end
-
   test "GET /custom_fields.xml should return custom fields" do
     get '/custom_fields.xml', {}, credentials('admin')
     assert_response :success
@@ -37,6 +33,8 @@ class Redmine::ApiTest::CustomFieldsTest < Redmine::ApiTest::Base
         assert_select 'possible_values[type=array]' do
           assert_select 'possible_value>value', :text => 'PostgreSQL'
         end
+        assert_select 'trackers[type=array]'
+        assert_select 'roles[type=array]'
       end
     end
   end

@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -27,9 +27,8 @@ module Redmine
           return if self.included_modules.include?(Redmine::Acts::Customizable::InstanceMethods)
           cattr_accessor :customizable_options
           self.customizable_options = options
-          has_many :custom_values, :as => :customized,
-                                   :include => :custom_field,
-                                   :order => "#{CustomField.table_name}.position",
+          has_many :custom_values, lambda {includes(:custom_field).order("#{CustomField.table_name}.position")},
+                                   :as => :customized,
                                    :dependent => :delete_all,
                                    :validate => false
 
@@ -46,7 +45,7 @@ module Redmine
         end
 
         def available_custom_fields
-          CustomField.where("type = '#{self.class.name}CustomField'").sorted.all
+          CustomField.where("type = '#{self.class.name}CustomField'").sorted.to_a
         end
 
         # Sets the values of the object's custom fields
@@ -72,10 +71,12 @@ module Redmine
             if values.has_key?(key)
               value = values[key]
               if value.is_a?(Array)
-                value = value.reject(&:blank?).uniq
+                value = value.reject(&:blank?).map(&:to_s).uniq
                 if value.empty?
                   value << ''
                 end
+              else
+                value = value.to_s
               end
               custom_field_value.value = value
             end
@@ -91,14 +92,15 @@ module Redmine
             if field.multiple?
               values = custom_values.select { |v| v.custom_field == field }
               if values.empty?
-                values << custom_values.build(:customized => self, :custom_field => field, :value => nil)
+                values << custom_values.build(:customized => self, :custom_field => field)
               end
               x.value = values.map(&:value)
             else
               cv = custom_values.detect { |v| v.custom_field == field }
-              cv ||= custom_values.build(:customized => self, :custom_field => field, :value => nil)
+              cv ||= custom_values.build(:customized => self, :custom_field => field)
               x.value = cv.value
             end
+            x.value_was = x.value.dup if x.value
             x
           end
         end

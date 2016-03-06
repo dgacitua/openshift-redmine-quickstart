@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,6 +20,7 @@ require File.expand_path('../../test_helper', __FILE__)
 class WikiContentTest < ActiveSupport::TestCase
   fixtures :projects, :enabled_modules,
            :users, :members, :member_roles, :roles,
+           :email_addresses,
            :wikis, :wiki_pages, :wiki_contents, :wiki_content_versions
 
   def setup
@@ -67,7 +68,7 @@ class WikiContentTest < ActiveSupport::TestCase
     assert_equal version_count+1, content.version
     assert_equal version_count+1, content.versions.length
 
-    version = WikiContent::Version.first(:order => 'id DESC')
+    version = WikiContent::Version.order('id DESC').first
     assert_equal @page.id, version.page_id
     assert_equal '', version.compression
     assert_equal "My new content", version.data
@@ -83,7 +84,7 @@ class WikiContentTest < ActiveSupport::TestCase
       end
     end
 
-    version = WikiContent::Version.first(:order => 'id DESC')
+    version = WikiContent::Version.order('id DESC').first
     assert_equal @page.id, version.page_id
     assert_equal 'gzip', version.compression
     assert_not_equal "My new content", version.data
@@ -95,7 +96,7 @@ class WikiContentTest < ActiveSupport::TestCase
     content = @page.content
     content.text = "My new content"
 
-    with_settings :notified_events => %w(wiki_content_updated) do
+    with_settings :notified_events => %w(wiki_content_updated), :default_language => 'en' do
       assert content.save
     end
 
@@ -121,8 +122,8 @@ class WikiContentTest < ActiveSupport::TestCase
   def test_current_version
     content = WikiContent.find(11)
     assert_equal true, content.current_version?
-    assert_equal true, content.versions.first(:order => 'version DESC').current_version?
-    assert_equal false, content.versions.first(:order => 'version ASC').current_version?
+    assert_equal true, content.versions.order('version DESC').first.current_version?
+    assert_equal false, content.versions.order('version ASC').first.current_version?
   end
 
   def test_previous_for_first_version_should_return_nil

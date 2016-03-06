@@ -133,7 +133,7 @@
 #
 # == Adding Tables
 #
-# In Textile, simple tables can be added by seperating each column by
+# In Textile, simple tables can be added by separating each column by
 # a pipe.
 #
 #     |a|simple|table|row|
@@ -341,7 +341,7 @@ class RedCloth3 < String
     A_HLGN = /(?:(?:<>|<|>|\=|[()]+)+)/
     A_VLGN = /[\-^~]/
     C_CLAS = '(?:\([^")]+\))'
-    C_LNGE = '(?:\[[^"\[\]]+\])'
+    C_LNGE = '(?:\[[a-z\-_]+\])'
     C_STYL = '(?:\{[^"}]+\})'
     S_CSPN = '(?:\\\\\d+)'
     S_RSPN = '(?:/\d+)'
@@ -384,7 +384,7 @@ class RedCloth3 < String
                 (?!\-\-)
                 (#{QTAGS_JOIN}|)      # oqs
                 (#{rcq})              # qtag
-                (\w|[^\s].*?[^\s])    # content
+                ([[:word:]]|[^\s].*?[^\s])    # content
                 (?!\-\-)
                 #{rcq}
                 (#{QTAGS_JOIN}|)      # oqa
@@ -393,7 +393,7 @@ class RedCloth3 < String
                 /(#{rcq})
                 (#{C})
                 (?::(\S+))?
-                (\w|[^\s\-].*?[^\s\-])
+                ([[:word:]]|[^\s\-].*?[^\s\-])
                 #{rcq}/xm 
             end
         [rc, ht, re, rtype]
@@ -480,7 +480,7 @@ class RedCloth3 < String
         end
 
         lang = $1 if
-            text.sub!( /\[([^)]+?)\]/, '' )
+            text.sub!( /\[([a-z\-_]+?)\]/, '' )
 
         cls = $1 if
             text.sub!( /\(([^()]+?)\)/, '' )
@@ -525,17 +525,17 @@ class RedCloth3 < String
             tatts = pba( tatts, 'table' )
             tatts = shelve( tatts ) if tatts
             rows = []
-            fullrow.gsub!(/([^|])\n/, "\\1<br />")
+            fullrow.gsub!(/([^|\s])\s*\n/, "\\1<br />")
             fullrow.each_line do |row|
                 ratts, row = pba( $1, 'tr' ), $2 if row =~ /^(#{A}#{C}\. )(.*)/m
                 cells = []
-                row.split( /(\|)(?![^\[\|]*\]\])/ )[1..-2].each do |cell|
-                    next if cell == '|'
+                # the regexp prevents wiki links with a | from being cut as cells 
+                row.scan(/\|(_?#{S}#{A}#{C}\. ?)?((\[\[[^|\]]*\|[^|\]]*\]\]|[^|])*?)(?=\|)/) do |modifiers, cell|
                     ctyp = 'd'
-                    ctyp = 'h' if cell =~ /^_/
+                    ctyp = 'h' if modifiers && modifiers =~ /^_/
 
-                    catts = ''
-                    catts, cell = pba( $1, 'td' ), $2 if cell =~ /^(_?#{S}#{A}#{C}\. ?)(.*)/
+                    catts = nil
+                    catts = pba( modifiers, 'td' ) if modifiers
 
                     catts = shelve( catts ) if catts
                     cells << "\t\t\t<t#{ ctyp }#{ catts }>#{ cell }</t#{ ctyp }>" 
@@ -986,8 +986,8 @@ class RedCloth3 < String
     end
     
     def retrieve( text ) 
-        @shelf.each_with_index do |r, i|
-            text.gsub!( " :redsh##{ i + 1 }:", r )
+        text.gsub!(/ :redsh#(\d+):/) do
+          @shelf[$1.to_i - 1] || $&
         end
     end
 

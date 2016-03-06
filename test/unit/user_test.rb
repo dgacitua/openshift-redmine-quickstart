@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +18,7 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class UserTest < ActiveSupport::TestCase
-  fixtures :users, :members, :projects, :roles, :member_roles, :auth_sources,
+  fixtures :users, :email_addresses, :members, :projects, :roles, :member_roles, :auth_sources,
             :trackers, :issue_statuses,
             :projects_trackers,
             :watchers,
@@ -27,6 +27,8 @@ class UserTest < ActiveSupport::TestCase
             :groups_users,
             :enabled_modules
 
+  include Redmine::I18n
+
   def setup
     @admin = User.find(1)
     @jsmith = User.find(2)
@@ -34,7 +36,9 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_sorted_scope_should_sort_user_by_display_name
-    assert_equal User.all.map(&:name).map(&:downcase).sort, User.sorted.all.map(&:name).map(&:downcase)
+    # Use .active to ignore anonymous with localized display name
+    assert_equal User.active.map(&:name).map(&:downcase).sort,
+                 User.active.sorted.map(&:name).map(&:downcase)
   end
 
   def test_generate
@@ -53,11 +57,41 @@ class UserTest < ActiveSupport::TestCase
     assert_equal "foo@bar.com", u.mail
   end
 
-  def test_mail_validation
-    u = User.new
+  def test_should_create_email_address
+    u = User.new(:firstname => "new", :lastname => "user")
+    u.login = "create_email_address"
+    u.mail = "defaultemail@somenet.foo"
+    assert u.save
+    u.reload
+    assert u.email_address
+    assert_equal "defaultemail@somenet.foo", u.email_address.address
+    assert_equal true, u.email_address.is_default
+    assert_equal true, u.email_address.notify
+  end
+
+  def test_should_not_create_user_without_mail
+    set_language_if_valid 'en'
+    u = User.new(:firstname => "new", :lastname => "user")
+    u.login = "user_without_mail"
+    assert !u.save
+    assert_equal ["Email #{I18n.translate('activerecord.errors.messages.blank')}"], u.errors.full_messages
+  end
+
+  def test_should_not_create_user_with_blank_mail
+    set_language_if_valid 'en'
+    u = User.new(:firstname => "new", :lastname => "user")
+    u.login = "user_with_blank_mail"
     u.mail = ''
-    assert !u.valid?
-    assert_include I18n.translate('activerecord.errors.messages.blank'), u.errors[:mail]
+    assert !u.save
+    assert_equal ["Email #{I18n.translate('activerecord.errors.messages.blank')}"], u.errors.full_messages
+  end
+
+  def test_should_not_update_user_with_blank_mail
+    set_language_if_valid 'en'
+    u = User.find(2)
+    u.mail = ''
+    assert !u.save
+    assert_equal ["Email #{I18n.translate('activerecord.errors.messages.blank')}"], u.errors.full_messages
   end
 
   def test_login_length_validation
@@ -138,7 +172,8 @@ class UserTest < ActiveSupport::TestCase
     u.login = 'newuser'
     u.password, u.password_confirmation = "password", "password"
     assert u.save
-    u = User.new(:firstname => "Similar", :lastname => "User", :mail => "similaruser@somenet.foo")
+    u = User.new(:firstname => "Similar", :lastname => "User",
+                 :mail => "similaruser@somenet.foo")
     u.login = 'NewUser'
     u.password, u.password_confirmation = "password", "password"
     assert !u.save
@@ -146,6 +181,7 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_mail_uniqueness_should_not_be_case_sensitive
+    set_language_if_valid 'en'
     u = User.new(:firstname => "new", :lastname => "user", :mail => "newuser@somenet.foo")
     u.login = 'newuser1'
     u.password, u.password_confirmation = "password", "password"
@@ -155,7 +191,7 @@ class UserTest < ActiveSupport::TestCase
     u.login = 'newuser2'
     u.password, u.password_confirmation = "password", "password"
     assert !u.save
-    assert_include I18n.translate('activerecord.errors.messages.taken'), u.errors[:mail]
+    assert_include "Email #{I18n.translate('activerecord.errors.messages.taken')}", u.errors.full_messages
   end
 
   def test_update
@@ -181,18 +217,18 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_delete_members_and_roles
-    members = Member.find_all_by_user_id(2)
-    ms = members.size
+    members = Member.where(:user_id => 2)
+    ms = members.count
     rs = members.collect(&:roles).flatten.size
-
+    assert ms > 0
+    assert rs > 0
     assert_difference 'Member.count', - ms do
       assert_difference 'MemberRole.count', - rs do
         User.find(2).destroy
       end
     end
-
     assert_nil User.find_by_id(2)
-    assert Member.find_all_by_user_id(2).empty?
+    assert_equal 0, Member.where(:user_id => 2).count
   end
 
   def test_destroy_should_update_attachments
@@ -207,7 +243,8 @@ class UserTest < ActiveSupport::TestCase
 
   def test_destroy_should_update_comments
     comment = Comment.create!(
-      :commented => News.create!(:project_id => 1, :author_id => 1, :title => 'foo', :description => 'foo'),
+      :commented => News.create!(:project_id => 1,
+                                 :author_id => 1, :title => 'foo', :description => 'foo'),
       :author => User.find(2),
       :comments => 'foo'
     )
@@ -218,7 +255,8 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_update_issues
-    issue = Issue.create!(:project_id => 1, :author_id => 2, :tracker_id => 1, :subject => 'foo')
+    issue = Issue.create!(:project_id => 1, :author_id => 2,
+                          :tracker_id => 1, :subject => 'foo')
 
     User.find(2).destroy
     assert_nil User.find_by_id(2)
@@ -226,7 +264,8 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_unassign_issues
-    issue = Issue.create!(:project_id => 1, :author_id => 1, :tracker_id => 1, :subject => 'foo', :assigned_to_id => 2)
+    issue = Issue.create!(:project_id => 1, :author_id => 1,
+                          :tracker_id => 1, :subject => 'foo', :assigned_to_id => 2)
 
     User.find(2).destroy
     assert_nil User.find_by_id(2)
@@ -234,7 +273,8 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_update_journals
-    issue = Issue.create!(:project_id => 1, :author_id => 2, :tracker_id => 1, :subject => 'foo')
+    issue = Issue.create!(:project_id => 1, :author_id => 2,
+                          :tracker_id => 1, :subject => 'foo')
     issue.init_journal(User.find(2), "update")
     issue.save!
 
@@ -244,13 +284,14 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_update_journal_details_old_value
-    issue = Issue.create!(:project_id => 1, :author_id => 1, :tracker_id => 1, :subject => 'foo', :assigned_to_id => 2)
+    issue = Issue.create!(:project_id => 1, :author_id => 1,
+                          :tracker_id => 1, :subject => 'foo', :assigned_to_id => 2)
     issue.init_journal(User.find(1), "update")
     issue.assigned_to_id = nil
     assert_difference 'JournalDetail.count' do
       issue.save!
     end
-    journal_detail = JournalDetail.first(:order => 'id DESC')
+    journal_detail = JournalDetail.order('id DESC').first
     assert_equal '2', journal_detail.old_value
 
     User.find(2).destroy
@@ -259,13 +300,14 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_update_journal_details_value
-    issue = Issue.create!(:project_id => 1, :author_id => 1, :tracker_id => 1, :subject => 'foo')
+    issue = Issue.create!(:project_id => 1, :author_id => 1,
+                          :tracker_id => 1, :subject => 'foo')
     issue.init_journal(User.find(1), "update")
     issue.assigned_to_id = 2
     assert_difference 'JournalDetail.count' do
       issue.save!
     end
-    journal_detail = JournalDetail.first(:order => 'id DESC')
+    journal_detail = JournalDetail.order('id DESC').first
     assert_equal '2', journal_detail.value
 
     User.find(2).destroy
@@ -275,16 +317,16 @@ class UserTest < ActiveSupport::TestCase
 
   def test_destroy_should_update_messages
     board = Board.create!(:project_id => 1, :name => 'Board', :description => 'Board')
-    message = Message.create!(:board_id => board.id, :author_id => 2, :subject => 'foo', :content => 'foo')
-
+    message = Message.create!(:board_id => board.id, :author_id => 2,
+                              :subject => 'foo', :content => 'foo')
     User.find(2).destroy
     assert_nil User.find_by_id(2)
     assert_equal User.anonymous, message.reload.author
   end
 
   def test_destroy_should_update_news
-    news = News.create!(:project_id => 1, :author_id => 2, :title => 'foo', :description => 'foo')
-
+    news = News.create!(:project_id => 1, :author_id => 2,
+                        :title => 'foo', :description => 'foo')
     User.find(2).destroy
     assert_nil User.find_by_id(2)
     assert_equal User.anonymous, news.reload.author
@@ -313,7 +355,8 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_update_time_entries
-    entry = TimeEntry.new(:hours => '2', :spent_on => Date.today, :activity => TimeEntryActivity.create!(:name => 'foo'))
+    entry = TimeEntry.new(:hours => '2', :spent_on => Date.today,
+                          :activity => TimeEntryActivity.create!(:name => 'foo'))
     entry.project_id = 1
     entry.user_id = 2
     entry.save!
@@ -332,7 +375,8 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_destroy_should_delete_watchers
-    issue = Issue.create!(:project_id => 1, :author_id => 1, :tracker_id => 1, :subject => 'foo')
+    issue = Issue.create!(:project_id => 1, :author_id => 1,
+                          :tracker_id => 1, :subject => 'foo')
     watcher = Watcher.create!(:user_id => 2, :watchable => issue)
 
     User.find(2).destroy
@@ -344,7 +388,9 @@ class UserTest < ActiveSupport::TestCase
     wiki_content = WikiContent.create!(
       :text => 'foo',
       :author_id => 2,
-      :page => WikiPage.create!(:title => 'Foo', :wiki => Wiki.create!(:project_id => 1, :start_page => 'Start'))
+      :page => WikiPage.create!(:title => 'Foo',
+                                :wiki => Wiki.create!(:project_id => 3,
+                                                      :start_page => 'Start'))
     )
     wiki_content.text = 'bar'
     assert_difference 'WikiContent::Version.count' do
@@ -391,6 +437,42 @@ class UserTest < ActiveSupport::TestCase
     end
   end
 
+  def test_password_change_should_destroy_tokens
+    recovery_token = Token.create!(:user_id => 2, :action => 'recovery')
+    autologin_token = Token.create!(:user_id => 2, :action => 'autologin')
+
+    user = User.find(2)
+    user.password, user.password_confirmation = "a new password", "a new password"
+    assert user.save
+
+    assert_nil Token.find_by_id(recovery_token.id)
+    assert_nil Token.find_by_id(autologin_token.id)
+  end
+
+  def test_mail_change_should_destroy_tokens
+    recovery_token = Token.create!(:user_id => 2, :action => 'recovery')
+    autologin_token = Token.create!(:user_id => 2, :action => 'autologin')
+
+    user = User.find(2)
+    user.mail = "user@somwehere.com"
+    assert user.save
+
+    assert_nil Token.find_by_id(recovery_token.id)
+    assert_equal autologin_token, Token.find_by_id(autologin_token.id)
+  end
+
+  def test_change_on_other_fields_should_not_destroy_tokens
+    recovery_token = Token.create!(:user_id => 2, :action => 'recovery')
+    autologin_token = Token.create!(:user_id => 2, :action => 'autologin')
+
+    user = User.find(2)
+    user.firstname = "Bobby"
+    assert user.save
+
+    assert_equal recovery_token, Token.find_by_id(recovery_token.id)
+    assert_equal autologin_token, Token.find_by_id(autologin_token.id)
+  end
+
   def test_validate_login_presence
     @admin.login = ""
     assert !@admin.save
@@ -418,7 +500,8 @@ class UserTest < ActiveSupport::TestCase
 
   def test_validate_password_length
     with_settings :password_min_length => '100' do
-      user = User.new(:firstname => "new100", :lastname => "user100", :mail => "newuser100@somenet.foo")
+      user = User.new(:firstname => "new100",
+                      :lastname => "user100", :mail => "newuser100@somenet.foo")
       user.login = "newuser100"
       user.password, user.password_confirmation = "password100", "password100"
       assert !user.save
@@ -428,7 +511,12 @@ class UserTest < ActiveSupport::TestCase
 
   def test_name_format
     assert_equal 'John S.', @jsmith.name(:firstname_lastinitial)
-    assert_equal 'Smith, John', @jsmith.name(:lastname_coma_firstname)
+    assert_equal 'Smith, John', @jsmith.name(:lastname_comma_firstname)
+    assert_equal 'J. Smith', @jsmith.name(:firstinitial_lastname)
+    assert_equal 'J.-P. Lang', User.new(:firstname => 'Jean-Philippe', :lastname => 'Lang').name(:firstinitial_lastname)
+  end
+
+  def test_name_should_use_setting_as_default_format
     with_settings :user_format => :firstname_lastname do
       assert_equal 'John Smith', @jsmith.reload.name
     end
@@ -472,26 +560,30 @@ class UserTest < ActiveSupport::TestCase
   end
 
   def test_fields_for_order_statement_should_return_fields_according_user_format_setting
-    with_settings :user_format => 'lastname_coma_firstname' do
-      assert_equal ['users.lastname', 'users.firstname', 'users.id'], User.fields_for_order_statement
+    with_settings :user_format => 'lastname_comma_firstname' do
+      assert_equal ['users.lastname', 'users.firstname', 'users.id'],
+                   User.fields_for_order_statement
     end
   end
 
   def test_fields_for_order_statement_width_table_name_should_prepend_table_name
     with_settings :user_format => 'lastname_firstname' do
-      assert_equal ['authors.lastname', 'authors.firstname', 'authors.id'], User.fields_for_order_statement('authors')
+      assert_equal ['authors.lastname', 'authors.firstname', 'authors.id'],
+                   User.fields_for_order_statement('authors')
     end
   end
 
   def test_fields_for_order_statement_with_blank_format_should_return_default
     with_settings :user_format => '' do
-      assert_equal ['users.firstname', 'users.lastname', 'users.id'], User.fields_for_order_statement
+      assert_equal ['users.firstname', 'users.lastname', 'users.id'],
+                   User.fields_for_order_statement
     end
   end
 
   def test_fields_for_order_statement_with_invalid_format_should_return_default
     with_settings :user_format => 'foo' do
-      assert_equal ['users.firstname', 'users.lastname', 'users.id'], User.fields_for_order_statement
+      assert_equal ['users.firstname', 'users.lastname', 'users.id'],
+                   User.fields_for_order_statement
     end
   end
 
@@ -540,97 +632,62 @@ class UserTest < ActiveSupport::TestCase
   end
 
   if ldap_configured?
-    context "#try_to_login using LDAP" do
-      context "with failed connection to the LDAP server" do
-        should "return nil" do
-          @auth_source = AuthSourceLdap.find(1)
-          AuthSource.any_instance.stubs(:initialize_ldap_con).raises(Net::LDAP::LdapError, 'Cannot connect')
+    test "#try_to_login using LDAP with failed connection to the LDAP server" do
+      auth_source = AuthSourceLdap.find(1)
+      AuthSource.any_instance.stubs(:initialize_ldap_con).raises(Net::LDAP::LdapError, 'Cannot connect')
 
-          assert_equal nil, User.try_to_login('edavis', 'wrong')
-        end
+      assert_equal nil, User.try_to_login('edavis', 'wrong')
+    end
+
+    test "#try_to_login using LDAP" do
+      assert_equal nil, User.try_to_login('edavis', 'wrong')
+    end
+
+    test "#try_to_login using LDAP binding with user's account" do
+      auth_source = AuthSourceLdap.find(1)
+      auth_source.account = "uid=$login,ou=Person,dc=redmine,dc=org"
+      auth_source.account_password = ''
+      auth_source.save!
+
+      ldap_user = User.new(:mail => 'example1@redmine.org', :firstname => 'LDAP', :lastname => 'user', :auth_source_id => 1)
+      ldap_user.login = 'example1'
+      ldap_user.save!
+
+      assert_equal ldap_user, User.try_to_login('example1', '123456')
+      assert_nil User.try_to_login('example1', '11111')
+    end
+
+    test "#try_to_login using LDAP on the fly registration" do
+      AuthSourceLdap.find(1).update_attribute :onthefly_register, true
+
+      assert_difference('User.count') do
+        assert User.try_to_login('edavis', '123456')
       end
 
-      context "with an unsuccessful authentication" do
-        should "return nil" do
-          assert_equal nil, User.try_to_login('edavis', 'wrong')
-        end
+      assert_no_difference('User.count') do
+        assert User.try_to_login('edavis', '123456')
       end
 
-      context "binding with user's account" do
-        setup do
-          @auth_source = AuthSourceLdap.find(1)
-          @auth_source.account = "uid=$login,ou=Person,dc=redmine,dc=org"
-          @auth_source.account_password = ''
-          @auth_source.save!
+      assert_nil User.try_to_login('example1', '11111')
+    end
 
-          @ldap_user = User.new(:mail => 'example1@redmine.org', :firstname => 'LDAP', :lastname => 'user', :auth_source_id => 1)
-          @ldap_user.login = 'example1'
-          @ldap_user.save!
-        end
+    test "#try_to_login using LDAP on the fly registration and binding with user's account" do
+      auth_source = AuthSourceLdap.find(1)
+      auth_source.update_attribute :onthefly_register, true
+      auth_source = AuthSourceLdap.find(1)
+      auth_source.account = "uid=$login,ou=Person,dc=redmine,dc=org"
+      auth_source.account_password = ''
+      auth_source.save!
 
-        context "with a successful authentication" do
-          should "return the user" do
-            assert_equal @ldap_user, User.try_to_login('example1', '123456')
-          end
-        end
-
-        context "with an unsuccessful authentication" do
-          should "return nil" do
-            assert_nil User.try_to_login('example1', '11111')
-          end
-        end
+      assert_difference('User.count') do
+        assert User.try_to_login('example1', '123456')
       end
 
-      context "on the fly registration" do
-        setup do
-          @auth_source = AuthSourceLdap.find(1)
-          @auth_source.update_attribute :onthefly_register, true
-        end
-
-        context "with a successful authentication" do
-          should "create a new user account if it doesn't exist" do
-            assert_difference('User.count') do
-              user = User.try_to_login('edavis', '123456')
-              assert !user.admin?
-            end
-          end
-
-          should "retrieve existing user" do
-            user = User.try_to_login('edavis', '123456')
-            user.admin = true
-            user.save!
-
-            assert_no_difference('User.count') do
-              user = User.try_to_login('edavis', '123456')
-              assert user.admin?
-            end
-          end
-        end
-
-        context "binding with user's account" do
-          setup do
-            @auth_source = AuthSourceLdap.find(1)
-            @auth_source.account = "uid=$login,ou=Person,dc=redmine,dc=org"
-            @auth_source.account_password = ''
-            @auth_source.save!
-          end
-
-          context "with a successful authentication" do
-            should "create a new user account if it doesn't exist" do
-              assert_difference('User.count') do
-                user = User.try_to_login('example1', '123456')
-                assert_kind_of User, user
-              end
-            end
-          end
-
-          context "with an unsuccessful authentication" do
-            should "return nil" do
-              assert_nil User.try_to_login('example1', '11111')
-            end
-          end
-        end
+      assert_no_difference('User.count') do
+        assert User.try_to_login('example1', '123456')
       end
+
+      assert_nil User.try_to_login('example1', '11111')
     end
 
   else
@@ -651,7 +708,7 @@ class UserTest < ActiveSupport::TestCase
     assert_kind_of AnonymousUser, anon1
     anon2 = AnonymousUser.create(
                 :lastname => 'Anonymous', :firstname => '',
-                :mail => '', :login => '', :status => 0)
+                :login => '', :status => 0)
     assert_equal 1, anon2.errors.count
   end
 
@@ -780,14 +837,86 @@ class UserTest < ActiveSupport::TestCase
     assert_nil membership
   end
 
-  def test_roles_for_project
-    # user with a role
+  def test_roles_for_project_with_member_on_public_project_should_return_roles_and_non_member
     roles = @jsmith.roles_for_project(Project.find(1))
     assert_kind_of Role, roles.first
-    assert_equal "Manager", roles.first.name
+    assert_equal ["Manager"], roles.map(&:name)
+  end
 
-    # user with no role
-    assert_nil @dlopper.roles_for_project(Project.find(2)).detect {|role| role.member?}
+  def test_roles_for_project_with_member_on_private_project_should_return_roles
+    Project.find(1).update_attribute :is_public, false
+
+    roles = @jsmith.roles_for_project(Project.find(1))
+    assert_kind_of Role, roles.first
+    assert_equal ["Manager"], roles.map(&:name)
+  end
+
+  def test_roles_for_project_with_non_member_with_public_project_should_return_non_member
+    set_language_if_valid 'en'
+    roles = User.find(8).roles_for_project(Project.find(1))
+    assert_equal ["Non member"], roles.map(&:name)
+  end
+
+  def test_roles_for_project_with_non_member_with_public_project_and_override_should_return_override_roles
+    project = Project.find(1)
+    Member.create!(:project => project, :principal => Group.non_member, :role_ids => [1, 2])
+    roles = User.find(8).roles_for_project(project)
+    assert_equal ["Developer", "Manager"], roles.map(&:name).sort
+  end
+
+  def test_roles_for_project_with_non_member_with_private_project_should_return_no_roles
+    Project.find(1).update_attribute :is_public, false
+  
+    roles = User.find(8).roles_for_project(Project.find(1))
+    assert_equal [], roles.map(&:name)
+  end
+
+  def test_roles_for_project_with_non_member_with_private_project_and_override_should_return_no_roles
+    project = Project.find(1)
+    project.update_attribute :is_public, false
+    Member.create!(:project => project, :principal => Group.non_member, :role_ids => [1, 2])
+    roles = User.find(8).roles_for_project(project)
+    assert_equal [], roles.map(&:name).sort
+  end
+
+  def test_roles_for_project_with_anonymous_with_public_project_should_return_anonymous
+    set_language_if_valid 'en'
+    roles = User.anonymous.roles_for_project(Project.find(1))
+    assert_equal ["Anonymous"], roles.map(&:name)
+  end
+
+  def test_roles_for_project_with_anonymous_with_public_project_and_override_should_return_override_roles
+    project = Project.find(1)
+    Member.create!(:project => project, :principal => Group.anonymous, :role_ids => [1, 2])
+    roles = User.anonymous.roles_for_project(project)
+    assert_equal ["Developer", "Manager"], roles.map(&:name).sort
+  end
+
+  def test_roles_for_project_with_anonymous_with_private_project_should_return_no_roles
+    Project.find(1).update_attribute :is_public, false
+  
+    roles = User.anonymous.roles_for_project(Project.find(1))
+    assert_equal [], roles.map(&:name)
+  end
+
+  def test_roles_for_project_with_anonymous_with_private_project_and_override_should_return_no_roles
+    project = Project.find(1)
+    project.update_attribute :is_public, false
+    Member.create!(:project => project, :principal => Group.anonymous, :role_ids => [1, 2])
+    roles = User.anonymous.roles_for_project(project)
+    assert_equal [], roles.map(&:name).sort
+  end
+
+  def test_roles_for_project_should_be_unique
+    m = Member.new(:user_id => 1, :project_id => 1)
+    m.member_roles.build(:role_id => 1)
+    m.member_roles.build(:role_id => 1)
+    m.save!
+
+    user = User.find(1)
+    project = Project.find(1)
+    assert_equal 1, user.roles_for_project(project).size
+    assert_equal [1], user.roles_for_project(project).map(&:id)
   end
 
   def test_projects_by_role_for_user_with_role
@@ -825,6 +954,11 @@ class UserTest < ActiveSupport::TestCase
     assert_equal 5, User.valid_notification_options.size
     assert_equal 5, User.valid_notification_options(User.find(7)).size
     assert_equal 6, User.valid_notification_options(User.find(2)).size
+  end
+
+  def test_notified_project_ids_setter_should_coerce_to_unique_integer_array
+    @jsmith.notified_project_ids = ["1", "123", "2u", "wrong", "12", 6, 12, -35, ""]
+    assert_equal [1, 123, 2, 12, 6], @jsmith.notified_projects_ids
   end
 
   def test_mail_notification_all
@@ -925,149 +1059,111 @@ class UserTest < ActiveSupport::TestCase
     end
   end
 
-  context "#allowed_to?" do
-    context "with a unique project" do
-      should "return false if project is archived" do
-        project = Project.find(1)
-        Project.any_instance.stubs(:status).returns(Project::STATUS_ARCHIVED)
-        assert_equal false, @admin.allowed_to?(:view_issues, Project.find(1))
-      end
+  test "#allowed_to? for archived project should return false" do
+    project = Project.find(1)
+    project.archive
+    project.reload
+    assert_equal false, @admin.allowed_to?(:view_issues, project)
+  end
 
-      should "return false for write action if project is closed" do
-        project = Project.find(1)
-        Project.any_instance.stubs(:status).returns(Project::STATUS_CLOSED)
-        assert_equal false, @admin.allowed_to?(:edit_project, Project.find(1))
-      end
+  test "#allowed_to? for closed project should return true for read actions" do
+    project = Project.find(1)
+    project.close
+    project.reload
+    assert_equal false, @admin.allowed_to?(:edit_project, project)
+    assert_equal true, @admin.allowed_to?(:view_project, project)
+  end
 
-      should "return true for read action if project is closed" do
-        project = Project.find(1)
-        Project.any_instance.stubs(:status).returns(Project::STATUS_CLOSED)
-        assert_equal true, @admin.allowed_to?(:view_project, Project.find(1))
-      end
+  test "#allowed_to? for project with module disabled should return false" do
+    project = Project.find(1)
+    project.enabled_module_names = ["issue_tracking"]
+    assert_equal true, @admin.allowed_to?(:add_issues, project)
+    assert_equal false, @admin.allowed_to?(:view_wiki_pages, project)
+  end
 
-      should "return false if related module is disabled" do
-        project = Project.find(1)
-        project.enabled_module_names = ["issue_tracking"]
-        assert_equal true, @admin.allowed_to?(:add_issues, project)
-        assert_equal false, @admin.allowed_to?(:view_wiki_pages, project)
-      end
-
-      should "authorize nearly everything for admin users" do
-        project = Project.find(1)
-        assert ! @admin.member_of?(project)
-        %w(edit_issues delete_issues manage_news add_documents manage_wiki).each do |p|
-          assert_equal true, @admin.allowed_to?(p.to_sym, project)
-        end
-      end
-
-      should "authorize normal users depending on their roles" do
-        project = Project.find(1)
-        assert_equal true, @jsmith.allowed_to?(:delete_messages, project)    #Manager
-        assert_equal false, @dlopper.allowed_to?(:delete_messages, project) #Developper
-      end
+  test "#allowed_to? for admin users should return true" do
+    project = Project.find(1)
+    assert ! @admin.member_of?(project)
+    %w(edit_issues delete_issues manage_news add_documents manage_wiki).each do |p|
+      assert_equal true, @admin.allowed_to?(p.to_sym, project)
     end
+  end
 
-    context "with multiple projects" do
-      should "return false if array is empty" do
-        assert_equal false, @admin.allowed_to?(:view_project, [])
-      end
+  test "#allowed_to? for normal users" do
+    project = Project.find(1)
+    assert_equal true, @jsmith.allowed_to?(:delete_messages, project)    #Manager
+    assert_equal false, @dlopper.allowed_to?(:delete_messages, project) #Developper
+  end
 
-      should "return true only if user has permission on all these projects" do
-        assert_equal true, @admin.allowed_to?(:view_project, Project.all)
-        assert_equal false, @dlopper.allowed_to?(:view_project, Project.all) #cannot see Project(2)
-        assert_equal true, @jsmith.allowed_to?(:edit_issues, @jsmith.projects) #Manager or Developer everywhere
-        assert_equal false, @jsmith.allowed_to?(:delete_issue_watchers, @jsmith.projects) #Dev cannot delete_issue_watchers
-      end
+  test "#allowed_to? with empty array should return false" do
+    assert_equal false, @admin.allowed_to?(:view_project, [])
+  end
 
-      should "behave correctly with arrays of 1 project" do
-        assert_equal false, User.anonymous.allowed_to?(:delete_issues, [Project.first])
-      end
-    end
+  test "#allowed_to? with multiple projects" do
+    assert_equal true, @admin.allowed_to?(:view_project, Project.all.to_a)
+    assert_equal false, @dlopper.allowed_to?(:view_project, Project.all.to_a) #cannot see Project(2)
+    assert_equal true, @jsmith.allowed_to?(:edit_issues, @jsmith.projects.to_a) #Manager or Developer everywhere
+    assert_equal false, @jsmith.allowed_to?(:delete_issue_watchers, @jsmith.projects.to_a) #Dev cannot delete_issue_watchers
+  end
 
-    context "with options[:global]" do
-      should "authorize if user has at least one role that has this permission" do
-        @dlopper2 = User.find(5) #only Developper on a project, not Manager anywhere
-        @anonymous = User.find(6)
-        assert_equal true, @jsmith.allowed_to?(:delete_issue_watchers, nil, :global => true)
-        assert_equal false, @dlopper2.allowed_to?(:delete_issue_watchers, nil, :global => true)
-        assert_equal true, @dlopper2.allowed_to?(:add_issues, nil, :global => true)
-        assert_equal false, @anonymous.allowed_to?(:add_issues, nil, :global => true)
-        assert_equal true, @anonymous.allowed_to?(:view_issues, nil, :global => true)
+  test "#allowed_to? with with options[:global] should return true if user has one role with the permission" do
+    @dlopper2 = User.find(5) #only Developper on a project, not Manager anywhere
+    @anonymous = User.find(6)
+    assert_equal true, @jsmith.allowed_to?(:delete_issue_watchers, nil, :global => true)
+    assert_equal false, @dlopper2.allowed_to?(:delete_issue_watchers, nil, :global => true)
+    assert_equal true, @dlopper2.allowed_to?(:add_issues, nil, :global => true)
+    assert_equal false, @anonymous.allowed_to?(:add_issues, nil, :global => true)
+    assert_equal true, @anonymous.allowed_to?(:view_issues, nil, :global => true)
+  end
+
+  # this is just a proxy method, the test only calls it to ensure it doesn't break trivially
+  test "#allowed_to_globally?" do
+    @dlopper2 = User.find(5) #only Developper on a project, not Manager anywhere
+    @anonymous = User.find(6)
+    assert_equal true, @jsmith.allowed_to_globally?(:delete_issue_watchers)
+    assert_equal false, @dlopper2.allowed_to_globally?(:delete_issue_watchers)
+    assert_equal true, @dlopper2.allowed_to_globally?(:add_issues)
+    assert_equal false, @anonymous.allowed_to_globally?(:add_issues)
+    assert_equal true, @anonymous.allowed_to_globally?(:view_issues)
+  end
+
+  def test_notify_about_issue
+    project = Project.find(1)
+    author = User.generate!
+    assignee = User.generate!
+    member = User.generate!
+    Member.create!(:user => member, :project => project, :role_ids => [1])
+    issue = Issue.generate!(:project => project, :assigned_to => assignee, :author => author)
+
+    tests = {
+      author => %w(all only_my_events only_owner selected),
+      assignee => %w(all only_my_events only_assigned selected),
+      member => %w(all)
+    }
+
+    tests.each do |user, expected|
+      User::MAIL_NOTIFICATION_OPTIONS.map(&:first).each do |option|
+        user.mail_notification = option
+        assert_equal expected.include?(option), user.notify_about?(issue)
       end
     end
   end
 
-  context "User#notify_about?" do
-    context "Issues" do
-      setup do
-        @project = Project.find(1)
-        @author = User.generate!
-        @assignee = User.generate!
-        @issue = Issue.generate!(:project => @project, :assigned_to => @assignee, :author => @author)
-      end
+  def test_notify_about_issue_for_previous_assignee
+    assignee = User.generate!(:mail_notification => 'only_assigned')
+    new_assignee = User.generate!(:mail_notification => 'only_assigned')
+    issue = Issue.generate!(:assigned_to => assignee)
 
-      should "be true for a user with :all" do
-        @author.update_attribute(:mail_notification, 'all')
-        assert @author.notify_about?(@issue)
-      end
+    assert assignee.notify_about?(issue)
+    assert !new_assignee.notify_about?(issue)
 
-      should "be false for a user with :none" do
-        @author.update_attribute(:mail_notification, 'none')
-        assert ! @author.notify_about?(@issue)
-      end
+    issue.assigned_to = new_assignee
+    assert assignee.notify_about?(issue)
+    assert new_assignee.notify_about?(issue)
 
-      should "be false for a user with :only_my_events and isn't an author, creator, or assignee" do
-        @user = User.generate!(:mail_notification => 'only_my_events')
-        Member.create!(:user => @user, :project => @project, :role_ids => [1])
-        assert ! @user.notify_about?(@issue)
-      end
-
-      should "be true for a user with :only_my_events and is the author" do
-        @author.update_attribute(:mail_notification, 'only_my_events')
-        assert @author.notify_about?(@issue)
-      end
-
-      should "be true for a user with :only_my_events and is the assignee" do
-        @assignee.update_attribute(:mail_notification, 'only_my_events')
-        assert @assignee.notify_about?(@issue)
-      end
-
-      should "be true for a user with :only_assigned and is the assignee" do
-        @assignee.update_attribute(:mail_notification, 'only_assigned')
-        assert @assignee.notify_about?(@issue)
-      end
-
-      should "be false for a user with :only_assigned and is not the assignee" do
-        @author.update_attribute(:mail_notification, 'only_assigned')
-        assert ! @author.notify_about?(@issue)
-      end
-
-      should "be true for a user with :only_owner and is the author" do
-        @author.update_attribute(:mail_notification, 'only_owner')
-        assert @author.notify_about?(@issue)
-      end
-
-      should "be false for a user with :only_owner and is not the author" do
-        @assignee.update_attribute(:mail_notification, 'only_owner')
-        assert ! @assignee.notify_about?(@issue)
-      end
-
-      should "be true for a user with :selected and is the author" do
-        @author.update_attribute(:mail_notification, 'selected')
-        assert @author.notify_about?(@issue)
-      end
-
-      should "be true for a user with :selected and is the assignee" do
-        @assignee.update_attribute(:mail_notification, 'selected')
-        assert @assignee.notify_about?(@issue)
-      end
-
-      should "be false for a user with :selected and is not the author or assignee" do
-        @user = User.generate!(:mail_notification => 'selected')
-        Member.create!(:user => @user, :project => @project, :role_ids => [1])
-        assert ! @user.notify_about?(@issue)
-      end
-    end
+    issue.save!
+    assert !assignee.notify_about?(issue)
+    assert new_assignee.notify_about?(issue)
   end
 
   def test_notify_about_news
@@ -1098,38 +1194,35 @@ class UserTest < ActiveSupport::TestCase
   end
 
   if Object.const_defined?(:OpenID)
+    def test_setting_identity_url
+      normalized_open_id_url = 'http://example.com/'
+      u = User.new( :identity_url => 'http://example.com/' )
+      assert_equal normalized_open_id_url, u.identity_url
+    end
 
-  def test_setting_identity_url
-    normalized_open_id_url = 'http://example.com/'
-    u = User.new( :identity_url => 'http://example.com/' )
-    assert_equal normalized_open_id_url, u.identity_url
-  end
+    def test_setting_identity_url_without_trailing_slash
+      normalized_open_id_url = 'http://example.com/'
+      u = User.new( :identity_url => 'http://example.com' )
+      assert_equal normalized_open_id_url, u.identity_url
+    end
 
-  def test_setting_identity_url_without_trailing_slash
-    normalized_open_id_url = 'http://example.com/'
-    u = User.new( :identity_url => 'http://example.com' )
-    assert_equal normalized_open_id_url, u.identity_url
-  end
+    def test_setting_identity_url_without_protocol
+      normalized_open_id_url = 'http://example.com/'
+      u = User.new( :identity_url => 'example.com' )
+      assert_equal normalized_open_id_url, u.identity_url
+    end
 
-  def test_setting_identity_url_without_protocol
-    normalized_open_id_url = 'http://example.com/'
-    u = User.new( :identity_url => 'example.com' )
-    assert_equal normalized_open_id_url, u.identity_url
-  end
+    def test_setting_blank_identity_url
+      u = User.new( :identity_url => 'example.com' )
+      u.identity_url = ''
+      assert u.identity_url.blank?
+    end
 
-  def test_setting_blank_identity_url
-    u = User.new( :identity_url => 'example.com' )
-    u.identity_url = ''
-    assert u.identity_url.blank?
-  end
-
-  def test_setting_invalid_identity_url
-    u = User.new( :identity_url => 'this is not an openid url' )
-    assert u.identity_url.blank?
-  end
-
+    def test_setting_invalid_identity_url
+      u = User.new( :identity_url => 'this is not an openid url' )
+      assert u.identity_url.blank?
+    end
   else
     puts "Skipping openid tests."
   end
-
 end

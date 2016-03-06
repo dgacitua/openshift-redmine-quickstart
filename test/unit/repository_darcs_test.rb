@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -43,14 +43,13 @@ class RepositoryDarcsTest < ActiveSupport::TestCase
                           :log_encoding => 'UTF-8'
                         )
     assert !repo.save
-    assert_include "Path to repository can't be blank",
+    assert_include "Path to repository cannot be blank",
                    repo.errors.full_messages
   end
 
   def test_blank_path_to_repository_error_message_fr
     set_language_if_valid 'fr'
-    str = "Chemin du d\xc3\xa9p\xc3\xb4t doit \xc3\xaatre renseign\xc3\xa9(e)"
-    str.force_encoding('UTF-8') if str.respond_to?(:force_encoding)
+    str = "Chemin du d\xc3\xa9p\xc3\xb4t doit \xc3\xaatre renseign\xc3\xa9(e)".force_encoding('UTF-8')
     repo = Repository::Darcs.new(
                           :project      => @project,
                           :url          => "",
@@ -79,8 +78,9 @@ class RepositoryDarcsTest < ActiveSupport::TestCase
       assert_equal NUM_REV, @repository.changesets.count
 
       # Remove changesets with revision > 3
-      @repository.changesets.all.each {|c| c.destroy if c.revision.to_i > 3}
+      @repository.changesets.each {|c| c.destroy if c.revision.to_i > 3}
       @project.reload
+      @repository.reload
       assert_equal 3, @repository.changesets.count
 
       @repository.fetch_changesets

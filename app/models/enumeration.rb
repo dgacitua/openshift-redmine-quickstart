@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,13 +18,13 @@
 class Enumeration < ActiveRecord::Base
   include Redmine::SubclassFactory
 
-  default_scope :order => "#{Enumeration.table_name}.position ASC"
+  default_scope lambda {order(:position)}
 
   belongs_to :project
 
-  acts_as_list :scope => 'type = \'#{type}\''
+  acts_as_list :scope => 'type = \'#{type}\' AND #{parent_id ? "parent_id = #{parent_id}" : "parent_id IS NULL"}'
   acts_as_customizable
-  acts_as_tree :order => "#{Enumeration.table_name}.position ASC"
+  acts_as_tree
 
   before_destroy :check_integrity
   before_save    :check_default
@@ -36,7 +36,7 @@ class Enumeration < ActiveRecord::Base
   validates_length_of :name, :maximum => 30
 
   scope :shared, lambda { where(:project_id => nil) }
-  scope :sorted, lambda { order("#{table_name}.position ASC") }
+  scope :sorted, lambda { order(:position) }
   scope :active, lambda { where(:active => true) }
   scope :system, lambda { where(:project_id => nil) }
   scope :named, lambda {|arg| where("LOWER(#{table_name}.name) = LOWER(?)", arg.to_s.strip)}
@@ -60,7 +60,7 @@ class Enumeration < ActiveRecord::Base
 
   def check_default
     if is_default? && is_default_changed?
-      Enumeration.update_all({:is_default => false}, {:type => type})
+      Enumeration.where({:type => type}).update_all({:is_default => false})
     end
   end
 
@@ -73,7 +73,7 @@ class Enumeration < ActiveRecord::Base
     self.objects_count != 0
   end
 
-  # Is this enumeration overiding a system level enumeration?
+  # Is this enumeration overriding a system level enumeration?
   def is_override?
     !self.parent.nil?
   end
@@ -104,7 +104,7 @@ class Enumeration < ActiveRecord::Base
   end
 
   # Does the +new+ Hash override the previous Enumeration?
-  def self.overridding_change?(new, previous)
+  def self.overriding_change?(new, previous)
     if (same_active_state?(new['active'], previous.active)) && same_custom_values?(new,previous)
       return false
     else
@@ -129,11 +129,37 @@ class Enumeration < ActiveRecord::Base
     return new == previous
   end
 
-private
-  def check_integrity
-    raise "Can't delete enumeration" if self.in_use?
+  # Overrides acts_as_list reset_positions_in_list so that enumeration overrides
+  # get the same position as the overriden enumeration
+  def reset_positions_in_list
+    acts_as_list_class.where(scope_condition).reorder("#{position_column} ASC, id ASC").each_with_index do |item, i|
+      acts_as_list_class.where("id = :id OR parent_id = :id", :id => item.id).
+        update_all({position_column => (i + 1)})
+    end
   end
 
+private
+  def check_integrity
+    raise "Cannot delete enumeration" if self.in_use?
+  end
+
+  # Overrides acts_as_list add_to_list_bottom so that enumeration overrides
+  # get the same position as the overriden enumeration
+  def add_to_list_bottom
+    if parent
+      self[position_column] = parent.position
+    else
+      super
+    end
+  end
+
+  # Overrides acts_as_list remove_from_list so that enumeration overrides
+  # get the same position as the overriden enumeration
+  def remove_from_list
+    if parent_id.blank?
+      super
+    end
+  end
 end
 
 # Force load the subclasses in development mode

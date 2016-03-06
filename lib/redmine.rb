@@ -1,5 +1,5 @@
 # Redmine - project management software
-# Copyright (C) 2006-2013  Jean-Philippe Lang
+# Copyright (C) 2006-2015  Jean-Philippe Lang
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,9 +18,14 @@
 require 'redmine/core_ext'
 
 begin
-  require 'RMagick' unless Object.const_defined?(:Magick)
+  require 'rmagick' unless Object.const_defined?(:Magick)
 rescue LoadError
   # RMagick is not available
+end
+begin
+  require 'redcarpet' unless Object.const_defined?(:Redcarpet)
+rescue LoadError
+  # Redcarpet is not available
 end
 
 require 'redmine/scm/base'
@@ -30,8 +35,7 @@ require 'redmine/activity'
 require 'redmine/activity/fetcher'
 require 'redmine/ciphering'
 require 'redmine/codeset_util'
-require 'redmine/custom_field_format'
-require 'redmine/i18n'
+require 'redmine/field_format'
 require 'redmine/menu_manager'
 require 'redmine/notifiable'
 require 'redmine/platform'
@@ -56,14 +60,9 @@ require 'redmine/views/builders'
 
 require 'redmine/themes'
 require 'redmine/hook'
+require 'redmine/hook/listener'
+require 'redmine/hook/view_listener'
 require 'redmine/plugin'
-
-if RUBY_VERSION < '1.9'
-  require 'fastercsv'
-else
-  require 'csv'
-  FCSV = CSV
-end
 
 Redmine::Scm::Base.add "Subversion"
 Redmine::Scm::Base.add "Darcs"
@@ -73,18 +72,6 @@ Redmine::Scm::Base.add "Bazaar"
 Redmine::Scm::Base.add "Git"
 Redmine::Scm::Base.add "Filesystem"
 
-Redmine::CustomFieldFormat.map do |fields|
-  fields.register 'string'
-  fields.register 'text'
-  fields.register 'int', :label => :label_integer
-  fields.register 'float'
-  fields.register 'list'
-  fields.register 'date'
-  fields.register 'bool', :label => :label_boolean
-  fields.register 'user', :only => %w(Issue TimeEntry Version Project), :edit_as => 'list'
-  fields.register 'version', :only => %w(Issue TimeEntry Version Project), :edit_as => 'list'
-end
-
 # Permissions
 Redmine::AccessControl.map do |map|
   map.permission :view_project, {:projects => [:show], :activities => [:index]}, :public => true, :read => true
@@ -93,7 +80,8 @@ Redmine::AccessControl.map do |map|
   map.permission :edit_project, {:projects => [:settings, :edit, :update]}, :require => :member
   map.permission :close_project, {:projects => [:close, :reopen]}, :require => :member, :read => true
   map.permission :select_project_modules, {:projects => :modules}, :require => :member
-  map.permission :manage_members, {:projects => :settings, :members => [:index, :show, :create, :update, :destroy, :autocomplete]}, :require => :member
+  map.permission :view_members, {:members => [:index, :show]}, :public => true, :read => true
+  map.permission :manage_members, {:projects => :settings, :members => [:index, :show, :new, :create, :update, :destroy, :autocomplete]}, :require => :member
   map.permission :manage_versions, {:projects => :settings, :versions => [:new, :create, :edit, :update, :close_completed, :destroy]}, :require => :member
   map.permission :add_subprojects, {:projects => [:new, :create]}, :require => :member
 
@@ -109,18 +97,18 @@ Redmine::AccessControl.map do |map|
                                   :queries => :index,
                                   :reports => [:issue_report, :issue_report_details]},
                                   :read => true
-    map.permission :add_issues, {:issues => [:new, :create, :update_form], :attachments => :upload}
-    map.permission :edit_issues, {:issues => [:edit, :update, :bulk_edit, :bulk_update, :update_form], :journals => [:new], :attachments => :upload}
+    map.permission :add_issues, {:issues => [:new, :create], :attachments => :upload}
+    map.permission :edit_issues, {:issues => [:edit, :update, :bulk_edit, :bulk_update], :journals => [:new], :attachments => :upload}
+    map.permission :copy_issues, {:issues => [:new, :create, :bulk_edit, :bulk_update], :attachments => :upload}
     map.permission :manage_issue_relations, {:issue_relations => [:index, :show, :create, :destroy]}
     map.permission :manage_subtasks, {}
     map.permission :set_issues_private, {}
     map.permission :set_own_issues_private, {}, :require => :loggedin
-    map.permission :add_issue_notes, {:issues => [:edit, :update, :update_form], :journals => [:new], :attachments => :upload}
+    map.permission :add_issue_notes, {:issues => [:edit, :update], :journals => [:new], :attachments => :upload}
     map.permission :edit_issue_notes, {:journals => :edit}, :require => :loggedin
     map.permission :edit_own_issue_notes, {:journals => :edit}, :require => :loggedin
     map.permission :view_private_notes, {}, :read => true, :require => :member
     map.permission :set_notes_private, {}, :require => :member
-    map.permission :move_issues, {:issues => [:bulk_edit, :bulk_update]}, :require => :loggedin
     map.permission :delete_issues, {:issues => :destroy}, :require => :member
     # Queries
     map.permission :manage_public_queries, {:queries => [:new, :create, :edit, :update, :destroy]}, :require => :member
@@ -129,6 +117,7 @@ Redmine::AccessControl.map do |map|
     map.permission :view_issue_watchers, {}, :read => true
     map.permission :add_issue_watchers, {:watchers => [:new, :create, :append, :autocomplete_for_user]}
     map.permission :delete_issue_watchers, {:watchers => :destroy}
+    map.permission :import_issues, {:imports => [:new, :create, :settings, :mapping, :run, :show]}
   end
 
   map.project_module :time_tracking do |map|
@@ -140,20 +129,20 @@ Redmine::AccessControl.map do |map|
   end
 
   map.project_module :news do |map|
-    map.permission :manage_news, {:news => [:new, :create, :edit, :update, :destroy], :comments => [:destroy]}, :require => :member
+    map.permission :manage_news, {:news => [:new, :create, :edit, :update, :destroy], :comments => [:destroy], :attachments => :upload}, :require => :member
     map.permission :view_news, {:news => [:index, :show]}, :public => true, :read => true
     map.permission :comment_news, {:comments => :create}
   end
 
   map.project_module :documents do |map|
-    map.permission :add_documents, {:documents => [:new, :create, :add_attachment]}, :require => :loggedin
-    map.permission :edit_documents, {:documents => [:edit, :update, :add_attachment]}, :require => :loggedin
+    map.permission :add_documents, {:documents => [:new, :create, :add_attachment], :attachments => :upload}, :require => :loggedin
+    map.permission :edit_documents, {:documents => [:edit, :update, :add_attachment], :attachments => :upload}, :require => :loggedin
     map.permission :delete_documents, {:documents => [:destroy]}, :require => :loggedin
     map.permission :view_documents, {:documents => [:index, :show, :download]}, :read => true
   end
 
   map.project_module :files do |map|
-    map.permission :manage_files, {:files => [:new, :create]}, :require => :loggedin
+    map.permission :manage_files, {:files => [:new, :create], :attachments => :upload}, :require => :loggedin
     map.permission :view_files, {:files => :index, :versions => :download}, :read => true
   end
 
@@ -164,7 +153,7 @@ Redmine::AccessControl.map do |map|
     map.permission :view_wiki_pages, {:wiki => [:index, :show, :special, :date_index]}, :read => true
     map.permission :export_wiki_pages, {:wiki => [:export]}, :read => true
     map.permission :view_wiki_edits, {:wiki => [:history, :diff, :annotate]}, :read => true
-    map.permission :edit_wiki_pages, :wiki => [:edit, :update, :preview, :add_attachment]
+    map.permission :edit_wiki_pages, :wiki => [:edit, :update, :preview, :add_attachment], :attachments => :upload
     map.permission :delete_wiki_pages_attachments, {}
     map.permission :protect_wiki_pages, {:wiki => :protect}, :require => :member
   end
@@ -180,9 +169,9 @@ Redmine::AccessControl.map do |map|
   map.project_module :boards do |map|
     map.permission :manage_boards, {:boards => [:new, :create, :edit, :update, :destroy]}, :require => :member
     map.permission :view_messages, {:boards => [:index, :show], :messages => [:show]}, :public => true, :read => true
-    map.permission :add_messages, {:messages => [:new, :reply, :quote]}
-    map.permission :edit_messages, {:messages => :edit}, :require => :member
-    map.permission :edit_own_messages, {:messages => :edit}, :require => :loggedin
+    map.permission :add_messages, {:messages => [:new, :reply, :quote], :attachments => :upload}
+    map.permission :edit_messages, {:messages => :edit, :attachments => :upload}, :require => :member
+    map.permission :edit_own_messages, {:messages => :edit, :attachments => :upload}, :require => :loggedin
     map.permission :delete_messages, {:messages => :destroy}, :require => :member
     map.permission :delete_own_messages, {:messages => :destroy}, :require => :loggedin
   end
@@ -241,7 +230,9 @@ Redmine::MenuManager.map :project_menu do |menu|
               :if => Proc.new { |p| p.shared_versions.any? }
   menu.push :issues, { :controller => 'issues', :action => 'index' }, :param => :project_id, :caption => :label_issue_plural
   menu.push :new_issue, { :controller => 'issues', :action => 'new', :copy_from => nil }, :param => :project_id, :caption => :label_issue_new,
-              :html => { :accesskey => Redmine::AccessKeys.key_for(:new_issue) }
+              :html => { :accesskey => Redmine::AccessKeys.key_for(:new_issue) },
+              :if => Proc.new { |p| p.trackers.any? },
+              :permission => :add_issues
   menu.push :gantt, { :controller => 'gantts', :action => 'show' }, :param => :project_id, :caption => :label_gantt
   menu.push :calendar, { :controller => 'calendars', :action => 'show' }, :param => :project_id, :caption => :label_calendar
   menu.push :news, { :controller => 'news', :action => 'index' }, :param => :project_id, :caption => :label_news_plural
@@ -278,7 +269,8 @@ Redmine::Search.map do |search|
 end
 
 Redmine::WikiFormatting.map do |format|
-  format.register :textile, Redmine::WikiFormatting::Textile::Formatter, Redmine::WikiFormatting::Textile::Helper
+  format.register :textile
+  format.register :markdown if Object.const_defined?(:Redcarpet)
 end
 
 ActionView::Template.register_template_handler :rsb, Redmine::Views::ApiTemplateHandler
