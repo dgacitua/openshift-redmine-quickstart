@@ -72,8 +72,8 @@ Once your installation is complete, it is highly recommended that you change the
 	cd ~/app-root/runtime/repo/config
 	wget —no-check-certificate https://raw.githubusercontent.com/chriswirz/openshift-redmine-3.0.1-quickstart/master/config/database.yml
 	cp database.yml database.yml.openshift
+	cp database.yml database.yml-1.9
 	cp configuration.yml.example configuration.yml.openshift
-	cp configuration.yml.example configuration.yml
 	cd ~/app-root/runtime/repo/
 
 	# bundle install
