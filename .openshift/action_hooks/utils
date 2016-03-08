@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# Copy from node/misc/bin/rhcsh
+#
+
+function mysql() {
+   #  Setup default options.
+   [ -n "$OPENSHIFT_MYSQL_DB_HOST" ]  &&  hostopt="-h $OPENSHIFT_MYSQL_DB_HOST"
+   portopt="-P ${OPENSHIFT_MYSQL_DB_PORT:-3306}"
+   useropt="-u ${OPENSHIFT_MYSQL_DB_USERNAME:-'admin'}"
+   passopt=--password="$OPENSHIFT_MYSQL_DB_PASSWORD"
+
+   #  Unset default value if it was provided to us.
+   for arg in $@; do
+      case "$arg" in
+         --host=*|-h)      unset hostopt  ;;
+         --port=*|-P)      unset portopt  ;;
+         --user=*|-u)      unset useropt  ;;
+         --password=*|-p)  unset passopt  ;;
+         *)  ;;
+      esac
+   done
+
+   /usr/bin/mysql ${hostopt} ${portopt} ${useropt} ${passopt} "$@"
+
+}  #  End of  mysql  function.
+
+function psql() {
+  pghost=${PGHOST:-$OPENSHIFT_POSTGRESQL_DB_HOST}
+  pattern="^/"
+  if [[ ! $pghost =~ $pattern ]]
+  then
+    pgport=${PGPORT:-$OPENSHIFT_POSTGRESQL_DB_PORT}
+  fi
+  pguser=${PGUSER:-$OPENSHIFT_POSTGRESQL_DB_USERNAME}
+  pgpassword=${PGPASSWORD:-$OPENSHIFT_POSTGRESQL_DB_PASSWORD}
+  pgdatabase=${PGDATABASE:-$OPENSHIFT_APP_NAME}
+
+  extra_args=""
+  # Ensure our psqlrc sets the histfile
+  grep HISTFILE $HOME/.psqlrc &> /dev/null
+  if [ $? -ne 0 ]
+  then
+    extra_args+=" --set HISTFILE=$OPENSHIFT_DATA_DIR/.psql_history-$pgdatabase"
+  fi
+
+  CMD=`which psql`
+  if [ $OPENSHIFT_POSTGRESQL_VERSION = '9.2' ]; then
+    which scl 2>&1 >/dev/null
+    if [ $? -eq 0 ]; then
+      CMD=`scl enable postgresql92 "which psql"`
+    fi
+  fi
+
+  PGHOST=$pghost \
+    PGPORT=$pgport \
+    PGUSER=$pguser \
+    PGPASSWORD=$pgpassword \
+    PGDATABASE=$pgdatabase \
+    $CMD $extra_args "$@"
+
+  if [ $? -eq 2 ]; then
+    lines=(
+      "psql: could not connect to server: Connection refused",
+      "        Is the server running on host \"${pghost}\" and accepting",
+      "        TCP/IP connections on port ${pgport}?"
+    )
+    errmsg=$(printf -- '%s\n' "${lines[@]}")
+  fi
+}
+

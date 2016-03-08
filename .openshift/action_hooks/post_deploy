@@ -1,0 +1,78 @@
+#!/bin/bash
+# This is a simple post deploy hook executed after your application
+# is deployed and started.  This script gets executed directly, so
+# it could be python, php, ruby, etc.
+
+set -e
+
+source $OPENSHIFT_REPO_DIR/.openshift/action_hooks/utils
+
+if [ ${OPENSHIFT_MYSQL_DB_HOST} ]; then
+    DBMS_NAME=mysql
+    function db_call() {
+        mysql "$OPENSHIFT_APP_NAME" $@
+    }
+
+    function db_list_tables() {
+        echo "use $OPENSHIFT_APP_NAME; show tables"  | db_call
+    }
+elif [ ${OPENSHIFT_POSTGRESQL_DB_HOST} ]; then
+    DBMS_NAME=postgresql
+    function db_call() {
+        psql "$OPENSHIFT_APP_NAME" $@
+    }
+
+    function db_list_tables() {
+        db_call -c '\d'
+    }
+else
+    echo 1>&2
+    echo "Could not find a database. Please run:" 1>&2
+    echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c mysql-5.1" 1>&2
+    echo "or:"
+    echo "rhc cartridge add -a $OPENSHIFT_APP_NAME -c postgresql-9.2" 1>&2
+    echo "then make a sample commit (add whitespace somewhere) and re-push" 1>&2
+    echo 1>&2
+    exit 5
+fi
+
+echo ------------------------
+echo Selected DBMS: $DBMS_NAME
+echo ------------------------
+
+# Determinate wheather it is or it isn't the initial deployment,
+# so the database will be created from redmine.sql or there are
+# changes which need to be migrated.
+
+if db_list_tables | grep attachments > /dev/null
+then
+    # Runs on every other Redmine application deployment
+    # except the first one.
+    pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+    echo "Migrating database"
+    bundle exec "env RAILS_ENV='production' rake db:migrate"
+    popd > /dev/null
+else
+    # Runs on the initial Redmine deployment
+    ###
+    # If the quickstart is updated for newer version
+    # redmine.sql needs to be updated too.
+
+    pushd ${OPENSHIFT_REPO_DIR}/db > /dev/null
+    echo "Loading database"
+    gunzip -c redmine-${DBMS_NAME}.sql.gz | db_call
+    rm redmine-${DBMS_NAME}.sql.gz
+    popd > /dev/null
+fi
+
+pushd ${OPENSHIFT_REPO_DIR} > /dev/null
+    echo "Generating secret token"
+    bundle exec "env RAILS_ENV='production' rake generate_secret_token"
+popd > /dev/null
+
+if [ ! -d ${OPENSHIFT_DATA_DIR}files ]
+then
+	mkdir ${OPENSHIFT_DATA_DIR}files
+fi
+
+ln -sf ${OPENSHIFT_DATA_DIR}files ${OPENSHIFT_REPO_DIR}files
